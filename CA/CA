@@ -45,5 +45,5 @@ organizationName 값으로 들어갈 값을 입력
 ![image](https://user-images.githubusercontent.com/74689088/115017886-2251ea00-9ef2-11eb-827b-15ef8c7443a9.png)  
 
 /usr/lib/ssl/misc/CA.pl -newca 명령어로 자동 인증서 생성  
-![image](https://user-images.githubusercontent.com/74689088/115018163-7f4da000-9ef2-11eb-972d-3aa6e50acb1a.png)  
+![image](https://user-images.githubusercontent.com/74689088/115018163-7f4da000-9ef2-11eb-972d-3aa6e50acb1a.png)
 
