@@ -1,1 +1,43 @@
-#HAPROXY
+; wsc-d-abudhabi 에서 아래와 같이 실행합니다.
+#vim /etc/haproxy/haproxy.cfg
+ 
+#systemctl restart haproxy
+
+; saopaulo, leipzig 에서 아래와 같이 실행합니다.
+#vim /etc/postfix/main.cf
+ 
+#vim /etc/dovecot/dovecot.conf
+ 
+#vim /etc/dovecot/conf.d/10-master.conf
+ 
+#systemctl restart postfix dovecot
+ 
+2. MAIL SYNC
+; rsync를 설치하고 스크립트로 해결합니다.
+(saopaulo, leipzig 공통)
+#apt-get install rsync mailutils
+#cp /usr/share/doc/rsync/examples/rsyncd.conf /etc/
+#vim /etc/rsyncd.conf
+ 
+#systemctl restart rsync
+
+; saopaulo 에서 아래와 같이 실행합니다.
+#echo “PM” > /root/tr.txt
+#vim /root/mail_sync.sh(sleep 10 -> sleep 40으로 변경하세요)
+ 
+#chmod 700 /root/mail_sync.sh
+
+#vim /etc/rc.local
+ 
+
+#reboot
+; leipzig 에서 아래와 같이 실행합니다.
+#echo “AM” > /root/tr.txt
+#vim /root/mail_sync.sh(sleep 10 -> sleep 40으로 변경하세요)
+ 
+#chmod 700 /root/mail_sync.sh
+
+#vim /etc/rc.local
+ 
+
+#reboot
