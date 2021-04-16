@@ -1,1 +1,49 @@
 #CA
+
+
+참고 : https://wiki.kldp.org/HOWTO/html/SSL-Certificates-HOWTO/x70.html  
+
+
+SSL(Secure Socket Layer) 프로토콜은 처음에 Netscape사에서 웹서버와 브라우저 사이의 보안을 위해 만들었다.  
+SSL은 Certificate Authority(CA)라 불리는 서드 파티로부터 서버와 클라이언트의 인증을 하는데 사용된다. 아래는 SSL이 어떻게 작동하는지에 대한 간단한 과정을 설명한 것이다.  
+
+[웹브라우저] SSL로 암호화된 페이지를 요청하게 된다. (일반적으로 https://가 사용된다)  
+
+[웹서버] Public Key를 인증서와 함께 전송한다.  
+
+[웹브라우저] 인증서가 자신이 신용있다고 판단한 CA(일반적으로 trusted root CA라고 불림)로부터 서명된 것인지 확인한다.   
+(역주:Internet Explorer나 Netscape와 같은 웹브라우저에는 이미 Verisign, Thawte와 같은 널리 알려진 root CA의 인증서가 설치되어 있다)   
+또한 날짜가 유효한지, 그리고 인증서가 접속하려는 사이트와 관련되어 있는지 확인한다.  
+
+[웹브라우저] Public Key를 사용해서 랜덤 대칭 암호화키(Random symmetric encryption key)를 비릇한 URL, http 데이터들을 암호화해서 전송한다.  
+
+[웹서버] Private Key를 이용해서 랜덤 대칭 암호화키와 URL, http 데이터를 복호화한다.  
+
+[웹서버] 요청받은 URL에 대한 응답을 웹브라우저로부터 받은 랜덤 대칭 암호화키를 이용하여 암호화해서 브라우저로 전송한다.  
+
+[웹브라우저] 대칭 키를 이용해서 http 데이터와 html문서를 복호화하고, 화면에 정보를 뿌려준다.  
+
+
+
+CA configure  
+
+/etc/ssl/openssl.cnf 수정  
+CA가 구성될 디렉토리 입력
+![image](https://user-images.githubusercontent.com/74689088/115017301-4d880980-9ef1-11eb-91fa-77b752dcd9a1.png)  
+
+match = 이 값은 인증서를 생성할 때 필수로 입력해야함
+optional = 입력하지 않아도 됨. 말 그대로 옵션.  
+![image](https://user-images.githubusercontent.com/74689088/115017668-d30bb980-9ef1-11eb-841f-8b7e32a44e58.png)  
+
+Default로 Some-state가 들어가지 않도록 주석  
+![image](https://user-images.githubusercontent.com/74689088/115017752-f46ca580-9ef1-11eb-937b-1a8e1532abb5.png)  
+
+organizationName 값으로 들어갈 값을 입력  
+![image](https://user-images.githubusercontent.com/74689088/115017823-0cdcc000-9ef2-11eb-9699-c57d1456263a.png)  
+
+/usr/lib/ssl/misc/CA.pl 인증서를 생성하기 윈 스크맅트에 CA가 구성될 디렉토리 값을 수정  
+![image](https://user-images.githubusercontent.com/74689088/115017886-2251ea00-9ef2-11eb-827b-15ef8c7443a9.png)  
+
+/usr/lib/ssl/misc/CA.pl -newca 명령어로 자동 인증서 생성  
+![image](https://user-images.githubusercontent.com/74689088/115018163-7f4da000-9ef2-11eb-972d-3aa6e50acb1a.png)  
+
