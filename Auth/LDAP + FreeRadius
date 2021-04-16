@@ -1,0 +1,214 @@
+root@ldap:~# apt-get install freeradius freeradius-ldap
+
+root@ldap:/etc/ldap/schema# cp /usr/share/doc/freeradius/examples/ openldap.schema ./
+
+root@ldap:/etc/ldap/schema# ls | grep .schema > schema_convert.conf
+root@ldap:/etc/ldap/schema# vim schema_convert.conf
+collective.schema
+corba.schema
+core.schema
+cosine.schema
+duaconf.schema
+dyngroup.schema
+inetorgperson.schema
+java.schema
+misc.schema
+nis.schema
+openldap.schema
+pmi.schema
+ppolicy.schema
+samba.schema
+
+아래와 같이 수정합니다.
+include /etc/ldap/schema/core.schema
+include /etc/ldap/schema/collective.schema
+include /etc/ldap/schema/corba.schema
+include /etc/ldap/schema/cosine.schema
+include /etc/ldap/schema/duaconf.schema
+include /etc/ldap/schema/dyngroup.schema
+include /etc/ldap/schema/inetorgperson.schema
+include /etc/ldap/schema/java.schema
+include /etc/ldap/schema/misc.schema
+include /etc/ldap/schema/nis.schema
+include /etc/ldap/schema/openldap.schema
+include /etc/ldap/schema/pmi.schema
+include /etc/ldap/schema/ppolicy.schema
+include /etc/ldap/schema/samba.schema
+
+root@ldap:/etc/ldap/schema# mkdir ldif_output
+root@ldap:/etc/ldap/schema# slapcat -f schema_convert.conf -F ldif_output -n0 | grep openldap,cn=schema
+dn: cn={10}openldap,cn=schema,cn=config
+
+root@ldap:/etc/ldap/schema# slapcat -f schema_convert.conf -F ldif_output -n0 -s "cn={10}openldap,cn=schema,cn=config" > cn=openldap.ldif
+
+
+root@ldap:/etc/ldap/schema# vim cn\=openldap.ldif
+:set nu
+  1 dn: cn={10}openldap,cn=schema,cn=config
+  2 objectClass: olcSchemaConfig
+  3 cn: {10}openldap
+
+ 아래와 같이 수정합니다.
+
+  1 dn: cn=openldap,cn=schema,cn=config
+  2 objectClass: olcSchemaConfig
+  3 cn: openldap
+.
+아래 부분을 삭제합니다.
+
+205 structuralObjectClass: olcSchemaConfig
+206 entryUUID: d07a2872-7618-1031-9aec-49b7966849a6
+207 creatorsName: cn=config
+208 createTimestamp: 20120809025108Z
+209 entryCSN: 20120809025108.273809Z#000000#000#000000
+210 modifiersName: cn=config
+211 modifyTimestamp: 20120809025108Z
+:x
+
+root@ldap:/etc/ldap/schema# ldapadd -Y EXTERNAL -H ldapi:/// -f cn=openldap.ldif
+SASL/EXTERNAL authentication started
+SASL username: gidNumber=0+uidNumber=0,cn=peercred,cn=external,cn=auth
+SASL SSF: 0
+adding new entry "cn=openldap,cn=schema,cn=config"
+
+root@ldap:/etc/ldap/schema# service slapd restart
+Stopping OpenLDAP: slapd.
+Starting OpenLDAP: slapd.
+root@ldap:~# cd /etc/freeradius/
+root@ldap:/etc/freeradius# vim eap.conf
+:set nu
+ 17         eap {
+ 18                 #  Invoke the default supported EAP type when
+ 19                 #  EAP-Identity response is received.
+ 20                 #
+ 21                 #  The incoming EAP messages DO NOT specify which EAP
+ 22                 #  type they will be using, so it MUST be set here.
+ 23                 #
+ 24                 #  For now, only one default EAP type may be used at a time.
+ 25                 #
+ 26                 #  If the EAP-Type attribute is set by another module,
+ 27                 #  then that EAP type takes precedence over the
+ 28                 #  default type configured here.
+ 29                 #
+ 30                 default_eap_type = peap
+ 31
+  .
+  .
+510                 peap {
+511                         #  The tunneled EAP session needs a default
+512                         #  EAP type which is separate from the one for
+513                         #  the non-tunneled EAP module.  Inside of the
+514                         #  PEAP tunnel, we recommend using MS-CHAPv2,
+515                         #  as that is the default type supported by
+516                         #  Windows clients.
+517                         default_eap_type = mschapv2
+518
+519                         #  the PEAP module also has these configuration
+520                         #  items, which are the same as for TTLS.
+521                         copy_request_to_tunnel = no
+522                         use_tunneled_reply = yes
+:x
+
+
+
+
+root@ldap:/etc/freeradius# vim radiusd.conf
+:set nu
+440         #
+441         #  allowed values: {no, yes}
+442         #
+443         auth = yes
+444
+445         #  Log passwords with the authentication requests.
+446         #  auth_badpass  - logs password if it's rejected
+447         #  auth_goodpass - logs password if it's correct
+448         #
+449         #  allowed values: {no, yes}
+450         #
+451         auth_badpass = yes
+452         auth_goodpass = yes
+:x
+
+
+root@ldap:/etc/freeradius# vim sites-enabled/default
+:set nu
+167         #
+168         #  The ldap module will set Auth-Type to LDAP if it has not
+169         #  already been set
+170         ldap
+.
+.
+280
+281         # Uncomment it if you want to use ldap for authentication
+282         #
+283         # Note that this means "check plain-text password against
+284         # the ldap database", which means that EAP won't work,
+285         # as it does not supply a plain-text password.
+286         Auth-Type LDAP {
+287                 ldap
+288         }
+289
+.
+.
+466         #  Un-comment the following if you have set
+467         #  'edir_account_policy_check = yes' in the ldap module sub-section     of
+468         #  the 'modules' section.
+469         #
+470         ldap
+471
+:x
+
+root@ldap:/etc/freeradius# vim sites-enabled/inner-tunnel
+:set nu
+140         #  The ldap module will set Auth-Type to LDAP if it has not
+141         #  already been set
+142         ldap
+.
+.
+225         # Uncomment it if you want to use ldap for authentication
+226         #
+227         # Note that this means "check plain-text password against
+228         # the ldap database", which means that EAP won't work,
+229         # as it does not supply a plain-text password.
+230         Auth-Type LDAP {
+231                 ldap
+232         }
+233
+.
+.
+286         #  Un-comment the following if you have set
+287         #  'edir_account_policy_check = yes' in the ldap module sub-section     of
+288         #  the 'modules' section.
+289         #
+290         ldap
+:x
+
+root@ldap:/etc/freeradius# vim modules/ldap
+:set nu
+ 29 ldap {
+ 30         #
+ 31         #  Note that this needs to match the name in the LDAP
+ 32         #  server certificate, if you're using ldaps.
+ 33         server = "ldap.korea.com"
+ 34         identity = "cn=admin,dc=korea,dc=com"
+ 35         password = password
+ 36         basedn = "dc=korea,dc=com"
+ 37         filter = "(uid=%{%{Stripped-User-Name}:-%{User-Name}})"
+ 38         #base_filter = "(objectclass=radiusprofile)"
+:x
+
+root@ldap:/etc/freeradius# service freeradius restart
+Stopping FreeRADIUS daemon: freeradius.
+Starting FreeRADIUS daemon: freeradius.
+
+root@ldap:/etc/freeradius# radtest -t mschap administrator password localhost 0 testing123
+Sending Access-Request of id 16 to 127.0.0.1 port 1812
+        User-Name = "administrator"
+        NAS-IP-Address = 192.168.60.10
+        NAS-Port = 0
+        MS-CHAP-Challenge = 0xc82c89a3c7c3ae2d
+        MS-CHAP-Response = 0x0001000000000000000000000000000000000000000000000000fa46afcbe35b5519f663768d61728bf1983012081b176ee2
+rad_recv: Access-Accept packet from host 127.0.0.1 port 1812, id=16, length=84
+        MS-CHAP-MPPE-Keys = 0xe52cac67419a9a22166a9e32f11580c1c0b62f9cd0bda6330000000000000000
+        MS-MPPE-Encryption-Policy = 0x00000001
+        MS-MPPE-Encryption-Types = 0x00000006
