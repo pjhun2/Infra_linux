@@ -28,23 +28,27 @@ SSL은 Certificate Authority(CA)라 불리는 서드 파티로부터 서버와 �
 CA configure  
 
 /etc/ssl/openssl.cnf 수정  
-CA가 구성될 디렉토리 입력  
-
-![image](https://user-images.githubusercontent.com/74689088/115019979-dd7b8280-9ef4-11eb-99db-414dfccea268.png)
+CA가 구성될 디렉토리 입력
+Line : 42
+dir = /etc/ca
 
 match = 이 값은 인증서를 생성할 때 필수로 입력해야함  
 optional = 입력하지 않아도 됨. 말 그대로 옵션.  
-![image](https://user-images.githubusercontent.com/74689088/115017668-d30bb980-9ef1-11eb-841f-8b7e32a44e58.png)  
+name = match
+orprovincename = optional
+
 
 Default로 Some-state가 들어가지 않도록 주석  
-![image](https://user-images.githubusercontent.com/74689088/115017752-f46ca580-9ef1-11eb-937b-1a8e1532abb5.png)  
+#stateOrProvinceName_default = Some-State
 
 organizationName 값으로 들어갈 값을 입력  
-![image](https://user-images.githubusercontent.com/74689088/115017823-0cdcc000-9ef2-11eb-9699-c57d1456263a.png)  
+O.organizationName_deafult = Test infomation
 
 /usr/lib/ssl/misc/CA.pl 인증서를 생성하기 윈 스크맅트에 CA가 구성될 디렉토리 값을 수정  
-![image](https://user-images.githubusercontent.com/74689088/115017886-2251ea00-9ef2-11eb-827b-15ef8c7443a9.png)  
+line : 37
+/etc/ca
+
 
 /usr/lib/ssl/misc/CA.pl -newca 명령어로 자동 인증서 생성  
-![image](https://user-images.githubusercontent.com/74689088/115018163-7f4da000-9ef2-11eb-972d-3aa6e50acb1a.png)
+
 
