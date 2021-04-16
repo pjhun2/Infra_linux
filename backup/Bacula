@@ -1,0 +1,458 @@
+Bacula Backup Solution 설치 및 설정
+
+1. MySQL Server 설치
+root@director:~# apt-get install mysql-server
+패키지 목록을 읽는 중입니다... 완료
+의존성 트리를 만드는 중입니다       
+상태 정보를 읽는 중입니다... 완료
+다음 패키지를 더 설치할 것입니다:
+  libdbd-mysql-perl libdbi-perl libhtml-template-perl libmysqlclient16
+  libnet-daemon-perl libplrpc-perl mysql-client-5.1 mysql-common
+  mysql-server-5.1 mysql-server-core-5.1
+제안하는 패키지:
+  libipc-sharedcache-perl libterm-readkey-perl tinyca
+다음 새 패키지를 설치할 것입니다:
+  libdbd-mysql-perl libdbi-perl libhtml-template-perl libmysqlclient16
+  libnet-daemon-perl libplrpc-perl mysql-client-5.1 mysql-common mysql-server
+  mysql-server-5.1 mysql-server-core-5.1
+0개 업그레이드, 11개 새로 설치, 0개 제거 및 0개 업그레이드 안 함.
+0 바이트/23.3 M바이트 아카이브를 받아야 합니다.
+이 작업 후 55.0 M바이트의 디스크 공간을 더 사용하게 됩니다.
+계속 하시겠습니까 [Y/n]? Y
+
+MySQL서버의 관리자 계정(root)에 대한 암호를 입력한다.
+
+MySQL서버의 관리자 암호를 확인한다.
+
+
+
+2. Bacula 패키지 설치
+패키지 목록을 읽는 중입니다... 완료
+의존성 트리를 만드는 중입니다       
+상태 정보를 읽는 중입니다... 완료
+다음 패키지를 더 설치할 것입니다:
+  bacula-client bacula-common bacula-common-mysql bacula-director-common
+  bacula-sd bacula-server bacula-traymonitor dbconfig-common mt-st mtx
+제안하는 패키지:
+  bacula-doc dds2tar scsitools sg3-utils
+추천하는 패키지:
+  bacula-sd-sqlite3 bacula-sd-tools
+다음 새 패키지를 설치할 것입니다:
+  bacula bacula-client bacula-common bacula-common-mysql bacula-console
+  bacula-director-common bacula-director-mysql bacula-fd bacula-sd
+  bacula-sd-mysql bacula-server bacula-traymonitor dbconfig-common mt-st mtx
+0개 업그레이드, 15개 새로 설치, 0개 제거 및 0개 업그레이드 안 함.
+0 바이트/2,985 k바이트 아카이브를 받아야 합니다.
+이 작업 후 8,266 k바이트의 디스크 공간을 더 사용하게 됩니다.
+계속 하시겠습니까 [Y/n]? Y
+
+bacula director Catalog를 저장할 데이터베이스를 생성한다.
+
+
+bacula DB생성을 위한 MySQL서버 관리자 암호를 입력한다.
+
+
+
+bacula DB생성을 위한 MySQL서버 관리자 암호를 확인한다.
+
+
+bacula DB 관리자 계정에 대한 암호를 입력한다.
+
+3. Bacula SD설정
+root@director:/# mkdir storage               ; 백업파일이 저장될 폴더 생성
+root@director:/# chown bacula.tape storage   ; 백업폴더의 소유권을 변경한다.
+root@director:/# ls -l
+합계 96
+drwxr-xr-x   2 root   root  4096 2013-05-30 15:25 bin
+drwxr-xr-x   3 root   root  4096 2013-05-29 21:09 boot
+drwxr-xr-x  14 root   root  3280 2013-05-30 14:59 dev
+drwxr-xr-x 125 root   root 12288 2013-05-30 15:25 etc
+drwxr-xr-x   3 root   root  4096 2013-05-29 20:55 home
+drwxr-xr-x  13 root   root 12288 2013-05-29 20:53 lib
+drwx------   2 root   root 16384 2013-05-29 20:49 lost+found
+drwxr-xr-x   4 root   root  4096 2013-05-29 20:49 media
+drwxr-xr-x   3 root   root  4096 2013-05-29 21:08 mnt
+drwxr-xr-x   2 root   root  4096 2013-05-29 20:49 opt
+dr-xr-xr-x 145 root   root     0 2013-05-30 14:59 proc
+drwx------   7 root   root  4096 2013-05-30 15:05 root
+drwxr-xr-x   2 root   root  4096 2013-05-30 15:19 sbin
+drwxr-xr-x   2 root   root  4096 2010-07-21 15:55 selinux
+drwxr-xr-x   2 root   root  4096 2013-05-29 20:49 srv
+drwxr-xr-x   2 bacula tape  4096 2013-05-30 15:29 storage
+
+root@director:/# vim /etc/bacula/bacula-sd.conf
+:set nu
+ 48 # Devices supported by this Storage daemon
+ 49 # To connect, the Director's bacula-dir.conf must have the
+ 50 #  same Name and MediaType. 
+ 51 #
+ 52 
+ 53 Device {
+ 54   Name = FileStorage
+ 55   Media Type = File
+ 56   Archive Device = /storage
+ 57   LabelMedia = yes;                   # lets Bacula label unlabeled media
+ 58   Random Access = Yes;
+ 59   AutomaticMount = yes;               # when device opened, read it
+ 60   RemovableMedia = no;
+ 61   AlwaysOpen = no;
+ 62 }
+:x
+
+4. Bacula Director 설정
+root@director:/# vim /etc/bacula/bacula-dir.conf 
+:set nu
+ 43 # Define the main nightly save backup job
+ 44 # By default, this job will back up to disk in /nonexistant/path/to/file/archive/dir
+ 45 Job {
+ 46   Name = "Backup_localhost"    ; localhost에 백업에 대한 Job설정
+ 47   JobDefs = "DefaultJob"
+ 48 }
+~
+~
+ 74 # Standard Restore template, to be changed by Console program
+ 75 #  Only one such job is needed for all Jobs/Clients/Storage ...
+ 76 #
+ 77 Job {
+ 78   Name = "RestoreFiles"
+ 79   Type = Restore
+ 80   Client=director-fd
+ 81   FileSet="Full Set"
+ 82   Storage = File
+ 83   Pool = File       ; Pool을 File를 설정한다.
+ 84   Messages = Standard
+ 85   Where = /home   ; 데이터를 복원할 기본 폴더 설정
+ 86 }
+~
+~
+ 89 # List of files to be backed up
+ 90 FileSet {
+ 91   Name = "Full Set"
+ 92   Include {
+ 93     Options {
+ 94       signature = MD5
+ 95     }
+ 96 #    
+ 97 #  Put your list of files here, preceded by 'File =', one per line
+ 98 #    or include an external list with:
+ 99 #
+100 #    File = <file-name
+101 #
+102 #  Note: / backs up everything on the root partition.
+103 #    if you have other partitions such as /usr or /home
+104 #    you will probably want to add them too.
+105 #
+106 #  By default this is defined to point to the Bacula binary
+107 #    directory to give a reasonable FileSet to backup to
+108 #    disk storage during initial testing.
+109 #
+110     File = /etc               ; 백업할 폴더를 나열한다.
+111     File = /usr
+112     File = /home
+113     File = /var/log
+114     File = /var/spool
+115   }
+116 
+117 #
+118 # If you backup the root directory, the following two excluded
+119 #   files can be useful
+120 #
+121   Exclude {
+122     File = /var/lib/bacula    ; 백업에서 제외할 폴더를 나열한다.
+123     File = /storage
+124     File = /proc
+125     File = /tmp
+126     File = /var/tmp
+127     File = /.journal
+128     File = /.fsck
+129   }
+130 }
+~
+~
+294 # File Pool definition
+295 Pool {
+296   Name = File
+297   Pool Type = Backup
+298   Recycle = yes                    # Bacula can automatically recycle Vol    umes
+299   AutoPrune = yes                 # Prune expired volumes
+300   Volume Retention = 90 days      ; 보관 기간을 설정한다.
+301   Maximum Volume Bytes = 10G    ; Volume 1개의 최대 사이즈를 설정한다.
+302   Maximum Volumes = 100         ; 생성할 최대 Volume 개수를 설정한다.
+303   LabelFormat = Pool-              ; Volume 라벨의 접두어를 설정한다.
+304 }
+
+서비스를 재시작 한다.
+root@director:/# service bacula-sd restart
+Stopping Bacula Storage daemon... :.
+Starting Bacula Storage daemon...:.
+root@director:/# service bacula-director restart
+Stopping Bacula Director...:.
+Starting Bacula Director...:.
+
+5. Volume Pool 생성
+root@director:/# bconsole 
+Connecting to Director localhost:9101
+1000 OK: director-dir Version: 5.0.2 (28 April 2010)
+Enter a period to cancel a command.
+*reload        ; 설정파일을 reload한다.
+*label         ; Volume 라벨을 설정한다.
+Automatically selected Catalog: MyCatalog
+Using Catalog "MyCatalog"
+Automatically selected Storage: File
+Enter new Volume name: Pool-0001
+Defined Pools:
+     1: Default
+     2: File
+     3: Scratch
+Select the Pool (1-3): 2
+Connecting to Storage daemon File at localhost:9103 ...
+Sending label command for Volume "Pool-0001" Slot 0 ...
+3000 OK label. VolBytes=194 DVD=0 Volume="Pool-0001" Device="FileStorage" (/storage)
+Catalog record for Volume "Pool-0001", Slot 0  successfully created.
+Requesting to mount FileStorage ...
+3906 File device "FileStorage" (/storage) is always mounted.
+*quit
+root@director:/# ls -l /storage/
+합계 4
+-rw-r----- 1 bacula tape 194 2013-05-30 15:57 Pool-0001       ; Volume 확인.
+
+6. Catalog 백업
+root@director:/# bconsole 
+Connecting to Director localhost:9101
+1000 OK: director-dir Version: 5.0.2 (28 April 2010)
+Enter a period to cancel a command.
+*run         ; 백업 실행
+Automatically selected Catalog: MyCatalog
+Using Catalog "MyCatalog"
+A job name must be specified.
+The defined Job resources are:
+     1: Backup_localhost
+     2: BackupCatalog
+     3: RestoreFiles
+Select Job resource (1-3): 2     ; 백업할 정책 선택
+Run Backup job
+JobName:  BackupCatalog
+Level:    Full
+Client:   director-fd
+FileSet:  Catalog
+Pool:     File (From Job resource)
+Storage:  File (From Job resource)
+When:     2013-05-30 16:03:19
+Priority: 11
+OK to run? (yes/mod/no): yes
+Job queued. JobId=1
+*list jobs                  ; 백업 결과 확인
+Automatically selected Catalog: MyCatalog
+Using Catalog "MyCatalog"
++-------+---------------+---------------------+------+-------+----------+----------+-----------+
++-------+---------------+---------------------+------+-------+----------+----------+-----------+
++-------+---------------+---------------------+------+-------+----------+----------+-----------+
+You have messages.
+
+7. localhost 백업
+root@director:/# bconsole 
+Connecting to Director localhost:9101
+1000 OK: director-dir Version: 5.0.2 (28 April 2010)
+Enter a period to cancel a command.
+*run
+Automatically selected Catalog: MyCatalog
+Using Catalog "MyCatalog"
+A job name must be specified.
+The defined Job resources are:
+     1: Backup_localhost
+     2: BackupCatalog
+     3: RestoreFiles
+Select Job resource (1-3): 1
+Run Backup job
+JobName:  Backup_localhost
+Level:    Incremental
+Client:   director-fd
+FileSet:  Full Set
+Pool:     File (From Job resource)
+Storage:  File (From Job resource)
+When:     2013-05-30 16:11:22
+Priority: 10
+OK to run? (yes/mod/no): yes
+Job queued. JobId=2
+You have messages.
+*list jobs
+root@director:/# ls –l /storage/      ; Volume 확인
+합계 2182324
+-rw-r----- 1 bacula tape 104793851 2013-05-30 16:11 Pool-0001
+-rw-r----- 1 bacula tape 104832172 2013-05-30 16:11 Pool-0002
+-rw-r----- 1 bacula tape 104832167 2013-05-30 16:11 Pool-0003
+-rw-r----- 1 bacula tape 104832194 2013-05-30 16:11 Pool-0004
+-rw-r----- 1 bacula tape 104832185 2013-05-30 16:11 Pool-0005
+-rw-r----- 1 bacula tape 104832188 2013-05-30 16:12 Pool-0006
+-rw-r----- 1 bacula tape 104832194 2013-05-30 16:12 Pool-0007
+
+
+
+8. 백업한 데이터 복원하기
+
+먼저 복원할 폴더를 만든다.
+root@director:/# mkdir restore
+root@director:/# bconsole 
+Connecting to Director localhost:9101
+1000 OK: director-dir Version: 5.0.2 (28 April 2010)
+Enter a period to cancel a command.
+*restore
+Automatically selected Catalog: MyCatalog
+Using Catalog "MyCatalog"
+
+First you select one or more JobIds that contain files
+to be restored. You will be presented several methods
+of specifying the JobIds. Then you will be allowed to
+select which files from those JobIds are to be restored.
+
+To select the JobIds, you have the following choices:
+     1: List last 20 Jobs run
+     2: List Jobs where a given File is saved
+     3: Enter list of comma separated JobIds to select
+     4: Enter SQL list command
+     5: Select the most recent backup for a client
+     6: Select backup for a client before a specified time
+     7: Enter a list of files to restore
+     8: Enter a list of files to restore before a specified time
+     9: Find the JobIds of the most recent backup for a client
+    10: Find the JobIds for a backup for a client before a specified time
+    11: Enter a list of directories to restore for found JobIds
+    12: Select full restore to a specified Job date
+    13: Cancel
+Select item:  (1-13): 5
+Automatically selected Client: director-fd
+The defined FileSet resources are:
+     1: Catalog
+     2: Full Set
+Select FileSet resource (1-2): 2
++-------+-------+----------+---------------+---------------------+------------+
+| JobId | Level | JobFiles | JobBytes      | StartTime           | VolumeName |
++-------+-------+----------+---------------+---------------------+------------+
+|     2 | F     |  145,412 | 3,151,263,154 | 2013-05-30 16:11:44 | Pool-0001  |
+|     2 | F     |  145,412 | 3,151,263,154 | 2013-05-30 16:11:44 | Pool-0002  |
+|     2 | F     |  145,412 | 3,151,263,154 | 2013-05-30 16:11:44 | Pool-0003  |
+|     2 | F     |  145,412 | 3,151,263,154 | 2013-05-30 16:11:44 | Pool-0004  |
+|     2 | F     |  145,412 | 3,151,263,154 | 2013-05-30 16:11:44 | Pool-0005  |
+|     2 | F     |  145,412 | 3,151,263,154 | 2013-05-30 16:11:44 | Pool-0006  |
+|     2 | F     |  145,412 | 3,151,263,154 | 2013-05-30 16:11:44 | Pool-0007  |
+|     2 | F     |  145,412 | 3,151,263,154 | 2013-05-30 16:11:44 | Pool-0008  |
+|     2 | F     |  145,412 | 3,151,263,154 | 2013-05-30 16:11:44 | Pool-0009  |
+|     2 | F     |  145,412 | 3,151,263,154 | 2013-05-30 16:11:44 | Pool-0010  |
++-------+-------+----------+---------------+---------------------+------------+
+
+
+You have selected the following JobId: 2
+
+132,089 files inserted into the tree.
+
+You are now entering file selection mode where you add (mark) and
+remove (unmark) files to be restored. No files are initially added, unless
+you used the "all" keyword on the command line.
+Enter "done" to leave this mode.
+
+cwd is: /
+$ mark *      ; 모든 파일을 복원
+145,412 files marked.
+$ done        ; 복원할 파일 선택 종료
+Bootstrap records written to /var/lib/bacula/director-dir.restore.1.bsr
+
+The job will require the following
+   Volume(s)                 Storage(s)                SD Device(s)
+===========================================================================
+   
+    Pool-0001                 File                      FileStorage           
+   
+Volumes marked with "*" are online.
+
+
+145,412 files selected to be restored.
+
+Run Restore job
+JobName:         RestoreFiles
+Bootstrap:       /var/lib/bacula/director-dir.restore.1.bsr
+Where:           /home          ; 기본 복원 폴더
+Replace:         always
+FileSet:         Full Set
+Backup Client:   director-fd
+Restore Client:  director-fd
+Storage:         File
+When:            2013-05-30 18:58:55
+Catalog:         MyCatalog
+Priority:        10
+Plugin Options:  *None*
+OK to run? (yes/mod/no): mod    ; 복원 위치를 변경하도록 한다.
+Parameters to modify:
+     1: Level
+     2: Storage
+     3: Job
+     4: FileSet
+     5: Restore Client
+     6: When
+     7: Priority
+     8: Bootstrap
+     9: Where
+    10: File Relocation
+    11: Replace
+    12: JobId
+    13: Plugin Options
+Select parameter to modify (1-13): 9
+Please enter path prefix for restore (/ for none): /restore   ; /restore 폴더로 변경
+Run Restore job
+JobName:         RestoreFiles
+Bootstrap:       /var/lib/bacula/director-dir.restore.1.bsr
+Where:           /restore        ; /restore로 변경된 것을 확인.
+Replace:         always
+FileSet:         Full Set
+Backup Client:   director-fd
+Restore Client:  director-fd
+Storage:         File
+When:            2013-05-30 18:58:55
+Catalog:         MyCatalog
+Priority:        10
+Plugin Options:  *None*
+OK to run? (yes/mod/no): yes
+Job queued. JobId=3
+You have messages.
+*quit
+root@director:/home/manager# ls –l /restore/
+합계 16
+drwxr-xr-x 125 root root 4096 2013-05-30 15:25 etc
+drwxr-xr-x   3 root root 4096 2013-05-29 20:55 home
+drwxr-xr-x  11 root root 4096 2013-05-29 21:04 usr
+drwxr-x--x   4 root root 4096 2013-05-30 19:02 var
+
+9. GUI 환경에서 Bacula director 제어하기
+root@director:/# apt-get install bacula-console-qt 
+패키지 목록을 읽는 중입니다... 완료
+의존성 트리를 만드는 중입니다       
+상태 정보를 읽는 중입니다... 완료
+다음 패키지를 더 설치할 것입니다:
+  libaudio2 libqt4-dbus libqt4-designer libqt4-network libqt4-qt3support
+  libqt4-script libqt4-sql libqt4-sql-mysql libqt4-xml libqtcore4 libqtgui4
+  qt4-qtconfig
+제안하는 패키지:
+  nas libqt4-dev
+다음 새 패키지를 설치할 것입니다:
+  bacula-console-qt libaudio2 libqt4-dbus libqt4-designer libqt4-network
+  libqt4-qt3support libqt4-script libqt4-sql libqt4-sql-mysql libqt4-xml
+  libqtcore4 libqtgui4 qt4-qtconfig
+0개 업그레이드, 13개 새로 설치, 0개 제거 및 0개 업그레이드 안 함.
+0 바이트/17.8 M바이트 아카이브를 받아야 합니다.
+이 작업 후 41.4 M바이트의 디스크 공간을 더 사용하게 됩니다.
+계속 하시겠습니까 [Y/n]? Y
+
+root@director:/# bat
+
+
+Bacula Admin Tool에서 백업 실행
+
+
+
+
+Bacula Admin Tool에서 복원
+
+
+
+
+
+
