@@ -30,7 +30,7 @@ CA configure
 /etc/ssl/openssl.cnf 수정  
 CA가 구성될 디렉토리 입력  
 
-![image](https://user-images.githubusercontent.com/74689088/115019316-fe8fa380-9ef3-11eb-9835-af78066458eb.png)   
+![image](https://user-images.githubusercontent.com/74689088/115019979-dd7b8280-9ef4-11eb-99db-414dfccea268.png)
 
 match = 이 값은 인증서를 생성할 때 필수로 입력해야함  
 optional = 입력하지 않아도 됨. 말 그대로 옵션.  
