@@ -1,0 +1,44 @@
+Debian Linux Freeradius 설치
+
+freeradius:~# apt-get install freeradius패키지 목록을 읽는 중입니다... 완료의존성 트리를 만드는 중입니다상태 정보를 읽는 중입니다... 완료다음 패키지를 더 설치할 것입니다:  freeradius-common freeradius-utils libdbi-perl libfreeradius2  libnet-daemon-perl libpcap0.8 libplrpc-perl제안하는 패키지:  freeradius-ldap freeradius-mysql freeradius-krb5 freeradius-postgresql  dbishell libcompress-zlib-perl다음 새 패키지를 설치할 것입니다:  freeradius freeradius-common freeradius-utils libdbi-perl libfreeradius2  libnet-daemon-perl libpcap0.8 libplrpc-perl0개 업그레이드, 8개 새로 설치, 0개 지우기 및 0개 업그레이드 안 함.0바이트/1790k바이트 아카이브를 받아야 합니다.이 작업 후 5722k바이트의 디스크 공간을 더 사용하게 됩니다.계속 하시겠습니까 [Y/n]? y
+미디어 바꾸기: '/cdrom/' 드라이브에 다음 레이블이 달린디스크를 넣고 enter를 누르십시오 'Debian GNU/Linux 5.0.3 _Lenny_ - Official i386 DVD Binary-2 20090905-08:48'
+전에 선택하지 않은 libfreeradius2 패키지를 선택합니다.(데이터베이스 읽는중 ...현재 90005개의 파일과 디렉토리가 설치되어 있습니다.)libfreeradius2 패키지를 푸는 중입니다 (.../libfreeradius2_2.0.4+dfsg-6_i386.deb에서) ...전에 선택하지 않은 freeradius-common 패키지를 선택합니다.freeradius-common 패키지를 푸는 중입니다 (.../freeradius-common_2.0.4+dfsg-6_all.deb에서) ...전에 선택하지 않은 freeradius 패키지를 선택합니다.freeradius 패키지를 푸는 중입니다 (.../freeradius_2.0.4+dfsg-6_i386.deb에서) ...man-db에 대한 트리거를 처리하는 중입니다 ...미디어 바꾸기: '/cdrom/' 드라이브에 다음 레이블이 달린디스크를 넣고 enter를 누르십시오 'Debian GNU/Linux 5.0.3 _Lenny_ - Official i386 DVD Binary-1 20090905-08:48'
+전에 선택하지 않은 libnet-daemon-perl 패키지를 선택합니다.(데이터베이스 읽는중 ...현재 90387개의 파일과 디렉토리가 설치되어 있습니다.)libnet-daemon-perl 패키지를 푸는 중입니다 (.../libnet-daemon-perl_0.38-1.1_all.deb에서) ...전에 선택하지 않은 libplrpc-perl 패키지를 선택합니다.libplrpc-perl 패키지를 푸는 중입니다 (.../libplrpc-perl_0.2017-1.1_all.deb에서) ...전에 선택하지 않은 libdbi-perl 패키지를 선택합니다.libdbi-perl 패키지를 푸는 중입니다 (.../libdbi-perl_1.605-1_i386.deb에서) ...전에 선택하지 않은 libpcap0.8 패키지를 선택합니다.libpcap0.8 패키지를 푸는 중입니다 (.../libpcap0.8_0.9.8-5_i386.deb에서) ...man-db에 대한 트리거를 처리하는 중입니다 ...미디어 바꾸기: '/cdrom/' 드라이브에 다음 레이블이 달린디스크를 넣고 enter를 누르십시오 'Debian GNU/Linux 5.0.3 _Lenny_ - Official i386 DVD Binary-3 20090905-08:48'
+전에 선택하지 않은 freeradius-utils 패키지를 선택합니다.(데이터베이스 읽는중 ...현재 90559개의 파일과 디렉토리가 설치되어 있습니다.)freeradius-utils 패키지를 푸는 중입니다 (.../freeradius-utils_2.0.4+dfsg-6_i386.deb에서) ...libfreeradius2 (2.0.4+dfsg-6) 설정하는 중입니다 ...freeradius-common (2.0.4+dfsg-6) 설정하는 중입니다 ...freeradius (2.0.4+dfsg-6) 설정하는 중입니다 ...맨 끝에 있는 /를 지웁니다맨 끝에 있는 /를 지웁니다맨 끝에 있는 /를 지웁니다Starting FreeRADIUS daemon: freeradius.libnet-daemon-perl (0.38-1.1) 설정하는 중입니다 ...libplrpc-perl (0.2017-1.1) 설정하는 중입니다 ...libdbi-perl (1.605-1) 설정하는 중입니다 ...libpcap0.8 (0.9.8-5) 설정하는 중입니다 ...freeradius-utils (2.0.4+dfsg-6) 설정하는 중입니다 ...
+ 
+freeradius:~# vim /etc/freeradius/radiusd.conf
+:set nu
+    362         #  Log authentication requests to the log file.    363         #    364         #  allowed values: {no, yes}    365         #    366         auth = yes    367    368         #  Log passwords with the authentication requests.    369         #  auth_badpass  - logs password if it's rejected    370         #  auth_goodpass - logs password if it's correct    371         #    372         #  allowed values: {no, yes}    373         #    374         auth_badpass = yes    375         auth_goodpass = yes    376 }
+:x
+freeradius:~# /etc/init.d/freeradius restartStopping FreeRADIUS daemon: freeradius.Starting FreeRADIUS daemon: freeradius.
+ 
+설치가 완료되면 디폴트로 등록되어 있는 localhost NAS를 사용하여 인증 테스트를 해 봅시다.
+freeradius:~# radtest manager P@ssworD localhost:1812 0 testing123Sending Access-Request of id 247 to 127.0.0.1 port 1812        User-Name = "manager"        User-Password = "P@ssworD"        NAS-IP-Address = 192.168.100.254        NAS-Port = 0rad_recv: Access-Accept packet from host 127.0.0.1 port 1812, id=247, length=20
+ 
+ 
+로그를 확인해 보면 인증에 성공한 것을 확인 할 수 있습니다.
+ 
+freeradius:~# cat /var/log/freeradius/radius.log | grep AuthSun Jan 24 05:28:53 2010 : Auth: Login OK: [manager/P@ssworD] (from client localhost port 0)
+ 
+이제 시스코 네트워크 네트워크 장비를 위한 NAS(Network Access Server)를 추가하도록 합니다.
+ 
+freeradius:~# vim /etc/freeradius/clients.conf
+client 192.168.100.10/32 {                                     # NAS의 IP를 입력한다. (client 192.168.100.0/24 식으로 서브넷을 지정해도 됩니다.)        secret          = P@sssworD                              # Radius 서버와 NAS간의 공유 암호를 설정한다.                 shortname   = Cisco WS-C3750-24TS-S         # NAS 이름을 설정한다.       nastype       = cisco                                          # nas타입을 설정한다. (정확한 타입을 모르면 생략한다.)}
+freeradius:~# /etc/init.d/freeradius restart           # 서비스를 재시작 한다.Stopping FreeRADIUS daemon: freeradius.Starting FreeRADIUS daemon: freeradius.
+ 
+시스코 네트워크 장비(WS-C3750-24TS-S) 설정
+ 
+WS-C3750-24TS#conf tWS-C3750-24TS(config)#aaa new-model      # AAA 활성화WS-C3750-24TS(config)#username administrator password password        # radius Server가 다운될 경우 local 인증할 계정등록WS-C3750-24TS(config)#aaa authentication login default group radius local      # radius인증을 먼저 수행한다.WS-C3750-24TS(config)#radius-server host 192.168.100.254 auth-port 1812 acct-port 1813 key P@ssworD    # radius 서버등록
+WS-C3750-24TS(config)#endWS-C3750-24TS#wr
+ 
+클라이언트 PC 도스창에서 스위치로 telnet 접속을 시도합니다.
+ 
+C:\Users\Administrator>telnet 192.168.100.10
+ 
+User Access Verification
+Username: managerPassword: ********
+WS-C3750-24TS>
+ 
+Freeradius 로그를 확인해 보면 스위치를 접속한 컴퓨터에서 인증에 성공한 로고가 생성된 것을 확인할 수 있습니다.
+ 
+freeradius:~# cat /var/log/freeradius/radius.logSun Jan 24 18:18:04 2010 : Auth: Login OK: [manager/P@ssworD] (from client Cisco WS-C3750-24TS-S port 1 cli 192.168.100.100)
