@@ -1,0 +1,24 @@
+In this tutorial I will show you how to integrate ClamAV antivirus into PureFTPd on Debian for virus scanning on upload.
+Step 1. First make sure you have followed this tutorial : How to install PureFTPd on Debian
+Step2. Install ClamAV and update the virus signatures.
+Install ClamAV:
+apt-get install clamav
+Now update the virus signatures:
+# freshclamClamAV update process started at Wed Sep 19 10:49:29 2012WARNING: Your ClamAV installation is OUTDATED!WARNING: Local version: 0.97.5 Recommended version: 0.97.6DON’T PANIC! Read http://www.clamav.net/support/faqmain.cvd is up to date (version: 54, sigs: 1044387, f-level: 60, builder: sven)daily.cld is up to date (version: 15370, sigs: 262330, f-level: 63, builder: jesler)bytecode.cld is up to date (version: 190, sigs: 36, f-level: 63, builder: neo)
+Step3. Configure PureFTpd to use ClamAV:
+First create one file called CallUploadScrip under the /etc/pure-ftpd/conf directory.
+touch /etc/pure-ftpd/conf/CallUploadScript
+And the simply echo the string “yes” into the file.
+echo “yes” >/etc/pure-ftpd/conf/CallUploadScript
+In the next step you need to create one file called for example “clamav_ftp_scan.sh”.
+touch /etc/pure-ftpd/clamav_ftp_scan.sh
+Then put this in the file and make it executable:
+#!/bin/sh/usr/bin/clamscan –remove –quiet –no-summary –log=/var/log/removed_files.log “$1″
+–remove Removes infected files;–quiet Will show only output error messages;–no-summary Disables summary at end of scanning;–log=/var/log/removed_files.log This will save scan report to /var/log/removed_files.log file.
+To make is executable use the following command:
+chmod 755 /etc/pure-ftpd/clamav_ftp_scan.sh
+Step4. Configure PureFTPd to use the script you just created above.
+Open the /etc/default/pure-ftpd-common file and add the following to UPLOADSCRIPT line:
+UPLOADSCRIPT=/etc/pure-ftpd/clamav_ftp_scan.sh
+Step5. Restart PureFTPd and start ClamAV.
+/etc/init.d/pure-ftpd restart/etc/init.d/clamav-freshclam start
