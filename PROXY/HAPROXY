@@ -1,6 +1,7 @@
 ; wsc-d-abudhabi 에서 아래와 같이 실행합니다.
 #vim /etc/haproxy/haproxy.cfg
- 
+ ![그림1](https://user-images.githubusercontent.com/74689088/115045135-322cf680-9f11-11eb-82a6-3ad1e96e16ec.png)
+
 #systemctl restart haproxy
 
 ; saopaulo, leipzig 에서 아래와 같이 실행합니다.
