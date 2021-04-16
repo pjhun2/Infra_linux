@@ -1,0 +1,114 @@
+Debian Linux에 포함되어 있는 FreeRadius는 기본적으로 PEAP인증을 할 수 없도록 컴파일되어 있다.
+ 
+따라서 먼저 Debian Linux SOURCE 패키지를 다운로드 하거나 인터넷이 가능한 Debian Linux 에서
+ 
+작업을 해야한다.
+ 
+1. 소스패키지 설치를 위한 준비를 한다.
+ 
+freeradius:~# apt-get install apt-src
+Reading package lists... DoneBuilding dependency treeReading state information... DoneThe following NEW packages will be installed:  apt-src0 upgraded, 1 newly installed, 0 to remove and 5 not upgraded.Need to get 0B/36.4kB of archives.After this operation, 77.8kB of additional disk space will be used.Selecting previously deselected package apt-src.(Reading database ... 32536 files and directories currently installed.)Unpacking apt-src (from .../apt-src_0.25.1-0.1_all.deb) ...Processing triggers for man-db ...Setting up apt-src (0.25.1-0.1) ...
+ 
+실제 설치과정은 위보다 많은 것들이 설치될 것이다.
+ 
+2. Freeradius 소스파일을 설치한다.
+freeradius:~# apt-src install freeradius
+Reading package lists... DoneBuilding dependency treeReading state information... DoneNeed to get 2960kB of source archives.Get:1 http://ftp.kr.debian.org lenny/main freeradius 2.0.4+dfsg-6 (dsc) [1476B]Get:2 http://ftp.kr.debian.org lenny/main freeradius 2.0.4+dfsg-6 (tar) [2954kB]Get:3 http://ftp.kr.debian.org lenny/main freeradius 2.0.4+dfsg-6 (diff) [4860B]Fetched 2960kB in 4s (732kB/s)gpg: Signature made Mon 08 Sep 2008 02:49:48 AM KST using DSA key ID D0EC0723gpg: Can't check signature: public key not founddpkg-source: extracting freeradius in freeradius-2.0.4+dfsgdpkg-source: info: unpacking freeradius_2.0.4+dfsg.orig.tar.gzdpkg-source: info: applying freeradius_2.0.4+dfsg-6.diff.gz
+ 
+만약, CD/DVD를 통하여 설치한다면 설치과정이 위와는 다르겠지요?
+명령을 수행한 디렉토리에 소스패키지가 설치된다.
+ 
+freeradius:~# ls -ltotal 2908drwxr-xr-x 15 root root    4096 2010-10-06 21:42 freeradius-2.0.4+dfsg-rw-r--r--  1 root root    4860 2008-09-08 03:02 freeradius_2.0.4+dfsg-6.diff.gz-rw-r--r--  1 root root    1476 2008-09-08 03:02 freeradius_2.0.4+dfsg-6.dsc-rw-r--r--  1 root root 2953674 2008-05-19 12:17 freeradius_2.0.4+dfsg.orig.tar.gz
+ 
+3. 패키지 컴파일을 위한 사전작업을 수행한다.
+ 
+freeradius:~# cd freeradius-2.0.4+dfsg/debian/freeradius:~/freeradius-2.0.4+dfsg/debian#vim rules
+:set nu    라인번호가 출력되게 한다.
+ 
+------------------- 중략 --------------------------------------------------------------------------------    
+     83                 --without-rlm_eap_tls \     84                 --without-rlm_eap_ttls \     85                 --without-rlm_eap_peap \     86                 --without-rlm_eap_tnc \     87                 --without-rlm_otp \     88                 --with-rlm_sql_postgresql_lib_dir=`pg_config --libdir` \     89                 --with-rlm_sql_postgresql_include_dir=`pg_config --inclu        dedir` \     90                 --without-openssl \
+------------------- 중략 --------------------------------------------------------------------------------
+ 
+아래와 같이 수정한다.
+ 
+------------------- 중략 --------------------------------------------------------------------------------    
+     83                 --with-rlm_eap_tls \     84                 --with-rlm_eap_ttls \     85                 --with-rlm_eap_peap \     86                 --without-rlm_eap_tnc \     87                 --without-rlm_otp \     88                 --with-rlm_sql_postgresql_lib_dir=`pg_config --libdir` \     89                 --with-rlm_sql_postgresql_include_dir=`pg_config --inclu        dedir` \     90                 --with-openssl \
+------------------- 중략 --------------------------------------------------------------------------------
+ 
+ 
+------------------- 중략 --------------------------------------------------------------------------------
+    179         for pkg in ${pkgs} ; do \    180           if dh_shlibdeps -p $$pkg -- -O 2>/dev/null | grep -q libssl; t        hen \    181             echo "$$pkg links to openssl" ;\    182             exit 1 ;\    183           fi ;\    184         done
+------------------- 중략 --------------------------------------------------------------------------------
+ 
+아래와 같이 수정한다.
+ 
+------------------- 중략 --------------------------------------------------------------------------------
+    179 #        for pkg in ${pkgs} ; do \    180 #          if dh_shlibdeps -p $$pkg -- -O 2>/dev/null | grep -q libssl; t        hen \    181 #            echo "$$pkg links to openssl" ;\    182 #            exit 1 ;\    183 #          fi ;\    184 #        done
+------------------- 중략 --------------------------------------------------------------------------------
+ 
+freeradius:~/freeradius-2.0.4+dfsg/debian# vim control
+:set nu    라인번호가 출력되게 한다.
+ 
+      1 Source: freeradius      2 Build-Depends: autotools-dev, debhelper (>= 6.0.7), libgdbm-dev, libiodbc2-dev, libkrb5-dev,        libldap2-dev, libltdl3-dev, libmysqlclient15-dev, libmysqlclient-dev, libpam0g-dev, libpcap-dev,        libperl-dev, libpq-dev, libsasl2-dev, libsnmp-dev, libtool, python-dev------------------- 중략 -----------------------------------------------------------------------------------------------
+ 
+아래와 같이 수정한다.
+ 
+      1 Source: freeradius      2 Build-Depends: autotools-dev, debhelper (>= 6.0.7), libgdbm-dev, libiodbc2-dev, libkrb5-dev,        libldap2-dev, libltdl3-dev, libmysqlclient15-dev, libmysqlclient-dev, libpam0g-dev, libpcap-dev,        libperl-dev, libpq-dev, libsasl2-dev, libsnmp-dev, libtool, python-dev, libssl-dev------------------- 중략 -----------------------------------------------------------------------------------------------
+ 
+freeradius:~/freeradius-2.0.4+dfsg/debian# cd ../..
+ 
+4. 패키지 컴파일 하기
+freeradius:~# apt-src build freeradius
+.
+.
+.
+. 
+make[1]: Leaving directory `/root/freeradius-2.0.4+dfsg' dpkg-genchanges -b >../freeradius_2.0.4+dfsg-6_i386.changesdpkg-genchanges: binary-only upload - not including any source codedpkg-buildpackage: binary only upload (no source included)I: Successfully built in /root/freeradius-2.0.4+dfsg
+freeradius:~# ls *.deb
+freeradius_2.0.4+dfsg-6_i386.debfreeradius-common_2.0.4+dfsg-6_all.debfreeradius-dbg_2.0.4+dfsg-6_i386.debfreeradius-dialupadmin_2.0.4+dfsg-6_all.debfreeradius-iodbc_2.0.4+dfsg-6_i386.debfreeradius-krb5_2.0.4+dfsg-6_i386.debfreeradius-ldap_2.0.4+dfsg-6_i386.debfreeradius-mysql_2.0.4+dfsg-6_i386.debfreeradius-postgresql_2.0.4+dfsg-6_i386.debfreeradius-utils_2.0.4+dfsg-6_i386.deblibfreeradius2_2.0.4+dfsg-6_i386.deblibfreeradius-dev_2.0.4+dfsg-6_i386.deb
+ 
+5. FreeRadius 패키지 설치하기
+freeradius:~# dpkg -i libfreeradius2_2.0.4+dfsg-6_i386.deb freeradius_2.0.4+dfsg-6_i386.deb  freeradius-common_2.0.4+dfsg-6_all.deb freeradius-utils_2.0.4+dfsg-6_i386.deb
+.
+.
+.
+Setting up libfreeradius2 (2.0.4+dfsg-6) ...Setting up freeradius-common (2.0.4+dfsg-6) ...Processing triggers for man-db ...Setting up freeradius-utils (2.0.4+dfsg-6) ...Setting up freeradius (2.0.4+dfsg-6) ...Stopping FreeRADIUS daemon: freeradius.Starting FreeRADIUS daemon: freeradius.
+6. 인증서 생성
+원래는 정식 인증서를 생성해야 하나 테스트를 목적으로 운영하는 관계로 번들 인증서를 생성한다.
+freeradius:~# cd /usr/share/doc/freeradius/examples/certs/freeradius:/usr/share/doc/freeradius/examples/certs# make openssl dhparam -out dh 1024Generating DH parameters, 1024 bit long safe prime, generator 2This is going to take a long time.........................................+............................................................
+........................................................................+.............+..............
+........................................................+...............+...........+...............
+....................................................+..................................+.............
+..............................................+.....................................................+
+...............................................................+....+......+........................
+...............................+..............................................+........+............
+............+......................................+.................................................
+................................................................+......................................
+Generating a 2048 bit RSA private key........................+++.........................................+++writing new private key to 'server.key'-----openssl req -new -x509 -keyout ca.key -out ca.pem -config ./ca.cnfGenerating a 2048 bit RSA private key.....+++.........................................................................................+++writing new private key to 'ca.key'-----openssl ca -batch -keyfile ca.key -cert ca.pem -in server.csr  -key `grep output_password ca.cnf | sed 's/.*=//;s/^ *//'` -out server.crt -extensions xpserver_ext -extfile xpextensions -config ./server.cnfUsing configuration from ./server.cnfCheck that the request matches the signatureSignature okCertificate Details:        Serial Number: 1 (0x1)        Validity            Not Before: Oct  6 13:19:50 2010 GMT            Not After : Oct  6 13:19:50 2011 GMT        Subject:            countryName               = FR            stateOrProvinceName       = Radius            organizationName          = Example Inc.            commonName                = Example Server Certificate            emailAddress              = admin@example.com        X509v3 extensions:            X509v3 Extended Key Usage:                TLS Web Server AuthenticationCertificate is to be certified until Oct  6 13:19:50 2011 GMT (365 days)
+Write out database with 1 new entriesData Base Updatedopenssl pkcs12 -export -in server.crt -inkey server.key -out server.p12  -passin pass:`grep output_password server.cnf | sed 's/.*=//;s/^ *//'` -passout pass:`grep output_password server.cnf | sed 's/.*=//;s/^ *//'`openssl pkcs12 -in server.p12 -out server.pem -passin pass:`grep output_password server.cnf | sed 's/.*=//;s/^ *//'` -passout pass:`grep output_password server.cnf | sed 's/.*=//;s/^ *//'`MAC verified OKfreeradius:/usr/share/doc/freeradius/examples/certs# cp -a * /etc/freeradius/certs/
+ 
+7. FreeRadis 설정하기
+freeradius:/usr/share/doc/freeradius/examples/certs# cd /etc/freeradiusfreeradius:/etc/freeradius# vim radiusd.conf
+:set nu    라인번호가 출력되게 한다.
+ 
+--------------------------------------- 중략 --------------------------------------------------------    661         mschap {    662                 #    663                 #  As of 0.9, the mschap module does NOT support    664                 #  reading from /etc/smbpasswd.    665                 #    666                 #  If you are using /etc/smbpasswd, see the 'passwd'    667                 #  module for an example of how to use /etc/smbpasswd    668    669                 # if use_mppe is not set to no mschap will    670                 # add MS-CHAP-MPPE-Keys for MS-CHAPv1 and    671                 # MS-MPPE-Recv-Key/MS-MPPE-Send-Key for MS-CHAPv2    672                 #    673                 #use_mppe = no    674    675                 # if mppe is enabled require_encryption makes    676                 # encryption moderate    677                 #    678                 #require_encryption = yes    679    680                 # require_strong always requires 128 bit key    681                 # encryption    682                 #    683                 #require_strong = yes
+--------------------------------------- 중략 --------------------------------------------------------
+아래와 같이 수정한다.
+ 
+--------------------------------------- 중략 --------------------------------------------------------    661         mschap {    662                 #    663                 #  As of 0.9, the mschap module does NOT support    664                 #  reading from /etc/smbpasswd.    665                 #    666                 #  If you are using /etc/smbpasswd, see the 'passwd'    667                 #  module for an example of how to use /etc/smbpasswd    668    669                 # if use_mppe is not set to no mschap will    670                 # add MS-CHAP-MPPE-Keys for MS-CHAPv1 and    671                 # MS-MPPE-Recv-Key/MS-MPPE-Send-Key for MS-CHAPv2    672                 #    673                 use_mppe = yes    674    675                 # if mppe is enabled require_encryption makes    676                 # encryption moderate    677                 #    678                 require_encryption = yes    679    680                 # require_strong always requires 128 bit key    681                 # encryption    682                 #    683                 require_strong = yes
+--------------------------------------- 중략 --------------------------------------------------------
+freeradius:/etc/freeradius# vim eap.conf
+:set nu    라인번호가 출력되게 한다.
+ 
+--------------------------------------- 중략 --------------------------------------------------------     26                 #  If the EAP-Type attribute is set by another module,     27                 #  then that EAP type takes precedence over the     28                 #  default type configured here.     29                 #     30                 default_eap_type = md5
+--------------------------------------- 중략 --------------------------------------------------------
+아래와 같이 수정한다.
+ 
+--------------------------------------- 중략 --------------------------------------------------------     26                 #  If the EAP-Type attribute is set by another module,     27                 #  then that EAP type takes precedence over the     28                 #  default type configured here.     29                 #     30                 default_eap_type = peap
+--------------------------------------- 중략 --------------------------------------------------------
+8. FreeRadius 실행하기
+router:/etc/freeradius# /etc/init.d/freeradius restartStopping FreeRADIUS daemon: freeradius.Starting FreeRADIUS daemon: freeradius.
+ 
+나머지 설정은 기존 FreeRadius설정과 동일하다.
+단, peap인증의 경우 리눅스 시스템계정을 통하여 인증이 불가하기 때문에 반드시 "/etc/freeradius/users" 을 사용해야 한다.
+물론 mysql과 연동하거나 ldap을 연동한다면 가능하다.
