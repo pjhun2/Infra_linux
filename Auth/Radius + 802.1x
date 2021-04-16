@@ -1,0 +1,451 @@
+1. ca.korea.com Self-Sign Root Certificate Authority 생성
+
+root@ca:~# vim /etc/ssl/openssl.cnf
+:set nu
+ 30 ####################################################################
+ 31 [ ca ]
+ 32 default_ca      = CA_default            # The default ca section
+ 33
+ 34 ####################################################################
+ 35 [ CA_default ]
+ 36
+ 37 dir             = /etc/ssl              # 루트인증기관이 설치될 디렉터리
+ 38 certs           = $dir/certs            # Where the issued certs are kept
+ 39 crl_dir         = $dir/crl              # Where the issued crl are kept
+ 40 database        = $dir/index.txt        # database index file.
+ 41 #unique_subject = no                    # Set to 'no' to allow creation of
+.
+.
+.
+159 [ usr_cert ]
+160 crlDistributionPoints = URI:http://ca.korea.com/crl/crl.pem   ; 인증서 해지목록
+161
+162 # These extensions are added when 'ca' signs a request.
+163
+164 # This goes against PKIX guidelines but some CAs do it and some software
+165 # requires this to avoid interpreting an end user certificate as a CA.
+.
+.
+211 [ v3_req ]
+212 crlDistributionPoints = URI:http://ca.korea.com/crl/crl.pem   ; 인증서 해지목록
+213 # Extensions to add to a certificate request
+214
+215 basicConstraints = CA:FALSE
+216 keyUsage = nonRepudiation, digitalSignature, keyEncipherment
+217
+218 [ v3_ca ]
+219 crlDistributionPoints = URI:http://ca.korea.com/crl/crl.pem    ; 인증서 해지목록
+220
+:x
+root@ca:~# vim /usr/lib/ssl/misc/CA.pl
+:set nu
+ 47 $SSLEAY_CONFIG=$ENV{"SSLEAY_CONFIG"};
+ 48 $DAYS="-days 365";      # 1 year
+ 49 $CADAYS="-days 1095";   # 3 years
+ 50 $REQ="$openssl req $SSLEAY_CONFIG";
+ 51 $CA="$openssl ca $SSLEAY_CONFIG";
+ 52 $VERIFY="$openssl verify";
+ 53 $X509="$openssl x509";
+ 54 $PKCS12="$openssl pkcs12";
+ 55
+ 56 $CATOP="/etc/ssl";                  # 루트인증기관이 설치될 디렉터리
+ 57 $CAKEY="cakey.pem";
+ 58 $CAREQ="careq.pem";
+ 59 $CACERT="cacert.pem";
+ 60
+ 61 $DIRMODE = 0777;
+:x
+
+root@ca:~# /usr/lib/ssl/misc/CA.pl –newca      ; 루트 인증기관 생성
+CA certificate filename (or enter to create)
+󰎠
+Making CA certificate ...
+Generating a 1024 bit RSA private key
+...........++++++
+..........++++++
+writing new private key to '/etc/ssl/private/cakey.pem'
+Enter PEM pass phrase:**********                ; 루트인증서의 개인키 암호
+Verifying - Enter PEM pass phrase:**********
+-----
+You are about to be asked to enter information that will be incorporated
+into your certificate request.
+What you are about to enter is what is called a Distinguished Name or a DN.
+There are quite a few fields but you can leave some blank
+For some fields there will be a default value,
+If you enter '.', the field will be left blank.
+-----
+Country Name (2 letter code) [AU]:KR
+State or Province Name (full name) [Some-State]:Chungbuk
+Locality Name (eg, city) []:Cheongju
+Organization Name (eg, company) [Internet Widgits Pty Ltd]:Jungsuk Information Technology
+Organizational Unit Name (eg, section) []:Company
+Common Name (eg, YOUR name) []:korea-CA
+Email Address []:
+
+Please enter the following 'extra' attributes
+to be sent with your certificate request
+A challenge password []:
+An optional company name []:
+Using configuration from /usr/lib/ssl/openssl.cnf
+Enter pass phrase for /etc/ssl/private/cakey.pem:
+Check that the request matches the signature
+Signature ok
+Certificate Details:
+        Serial Number:
+            e2:25:f9:74:05:bf:55:4f
+        Validity
+            Not Before: Aug 13 09:06:40 2013 GMT
+            Not After : Aug 12 09:06:40 2016 GMT
+        Subject:
+            countryName               = KR
+            stateOrProvinceName       = Chungbuk
+            organizationName          = Jungsuk Information Technology
+            organizationalUnitName    = Company
+            commonName                = korea-CA
+        X509v3 extensions:
+            X509v3 CRL Distribution Points:
+                URI:http://ca.korea.com/crl/crl.pem
+
+            X509v3 Subject Key Identifier:
+                29:D2:43:5A:6A:C6:17:D3:BE:66:43:FD:74:36:1D:1B:85:B5:6E:93
+            X509v3 Authority Key Identifier:
+                keyid:29:D2:43:5A:6A:C6:17:D3:BE:66:43:FD:74:36:1D:1B:85:B5:6E:93
+                DirName:/C=KR/ST=Chungbuk/O=Jungsuk Information Technology/OU=Company/CN=korea-CA
+                serial:E2:25:F9:74:05:BF:55:4F
+
+            X509v3 Basic Constraints:
+                CA:TRUE
+Certificate is to be certified until Aug 12 09:06:40 2016 GMT (1095 days)
+
+Write out database with 1 new entries
+Data Base Updated
+
+root@ca:~# cd /etc/ssl/crl/
+root@ca:/etc/ssl/crl# openssl ca -gencrl –out crl.pem    ; crl DB생성
+Using configuration from /usr/lib/ssl/openssl.cnf
+Enter pass phrase for /etc/ssl/private/cakey.pem:**********  ; 루트인증서의 개인키 암호
+
+root@ca:~# vim /etc/apache2/sites-enabled/000-default    ; crl 배포지점 생성
+:set nu
+ 16         Alias /crl /etc/ssl/crl/
+ 17         <Directory /etc/ssl/crl/>
+ 18                 Options Indexes FollowSymLinks MultiViews
+ 19                 AllowOverride None
+ 20                 Order allow,deny
+ 21                 allow from all
+ 22         </Directory>
+:x
+
+root@ca:~# service apache2 restart
+Restarting web server: apache2 ... waiting .
+
+2. auth.korea.com서버에 Freeradius 설정
+
+root@auth:~# apt-get install freeradius
+Reading package lists... Done
+Building dependency tree
+Reading state information... Done
+The following extra packages will be installed:
+  freeradius-common freeradius-utils libdbi-perl libfreeradius2 libltdl7
+  libnet-daemon-perl libpcap0.8 libperl5.10 libplrpc-perl libpython2.6
+  ssl-cert
+Suggested packages:
+  freeradius-ldap freeradius-postgresql freeradius-mysql freeradius-krb5
+  openssl-blacklist
+The following NEW packages will be installed:
+  freeradius freeradius-common freeradius-utils libdbi-perl libfreeradius2
+  libltdl7 libnet-daemon-perl libpcap0.8 libperl5.10 libplrpc-perl
+  libpython2.6 ssl-cert
+0 upgraded, 12 newly installed, 0 to remove and 0 not upgraded.
+Need to get 0 B/4,082 kB of archives.
+After this operation, 11.3 MB of additional disk space will be used.
+Do you want to continue [Y/n]?Y
+
+root@auth:~# cd /etc/freeradius/certs/
+root@auth:/etc/freeradius/certs# rm –f server.* ca.pem   ; 번들 인증서 삭제
+root@auth:/etc/freeradius/certs# openssl req -out server.csr -new -newkey rsa:2048 -sha1 -nodes –keyout server.key      ; Server 인증서 생성
+Generating a 2048 bit RSA private key
+.................................+++
+.............................+++
+writing new private key to 'server.key'
+-----
+You are about to be asked to enter information that will be incorporated
+into your certificate request.
+What you are about to enter is what is called a Distinguished Name or a DN.
+There are quite a few fields but you can leave some blank
+For some fields there will be a default value,
+If you enter '.', the field will be left blank.
+-----
+Country Name (2 letter code) [AU]:KR
+State or Province Name (full name) [Some-State]:Chungbuk
+Locality Name (eg, city) []:Cheongju
+Organization Name (eg, company) [Internet Widgits Pty Ltd]:Jungsuk
+Organizational Unit Name (eg, section) []:Company
+Common Name (eg, YOUR name) []:auth.korea.com
+Email Address []:
+
+Please enter the following 'extra' attributes
+to be sent with your certificate request
+A challenge password []:
+An optional company name []:
+
+root@auth:/etc/freeradius/certs# ftp ca.korea.com   ; 인증서 요청파일 인증서버로 전송
+Connected to ca.korea.com.
+220 (vsFTPd 2.3.2)
+Name (ca.korea.com:root): manager
+331 Please specify the password.
+Password:**********
+230 Login successful.
+Remote system type is UNIX.
+Using binary mode to transfer files.
+ftp> put server.csr
+local: server.csr remote: server.csr
+200 PORT command successful. Consider using PASV.
+150 Ok to send data.
+226 Transfer complete.
+1017 bytes sent in 0.00 secs (3762.0 kB/s)
+
+root@auth:/etc/freeradius/certs# cd /usr/share/doc/freeradius/examples/certs/
+root@auth:/usr/share/doc/freeradius/examples/certs# ftp ca.korea.com
+Connected to ca.korea.com.
+220 (vsFTPd 2.3.2)
+Name (ca.korea.com:root): manager
+331 Please specify the password.
+Password:**********
+230 Login successful.
+Remote system type is UNIX.
+Using binary mode to transfer files.
+ftp> put xpextensions    ; 클라이언트 인증을 위한 확장 옵션
+local: xpextensions remote: xpextensions
+200 PORT command successful. Consider using PASV.
+150 Ok to send data.
+226 Transfer complete.
+578 bytes sent in 0.00 secs (2266.9 kB/s)
+ftp> quit
+221 Goodbye.
+
+
+root@ca:~# cd ~manager
+root@ca:/home/manager# openssl x509 -req -days 365 -in server.csr -CA /etc/ssl/cacert.pem -CAkey /etc/ssl/private/cakey.pem -CAcreateserial -extensions xpserver_ext -extfile xpextensions –out server.pem   ; 인증서 사인
+Signature ok
+subject=/C=KR/ST=Chungbuk/L=Cheongju/O=Jungsuk/OU=Company/CN=auth.korea.com
+Getting CA Private Key
+Enter pass phrase for /etc/ssl/private/cakey.pem:**********  ; 루트인증서 암호
+
+root@auth:~# cd /etc/freeradius/certs/
+root@auth:/etc/freeradius/certs# ftp ca.korea.com
+Connected to ca.korea.com.
+220 (vsFTPd 2.3.2)
+Name (ca.korea.com:root): manager
+331 Please specify the password.
+Password:**********
+230 Login successful.
+Remote system type is UNIX.
+Using binary mode to transfer files.
+ftp> get cacert.pem   ; 루트인증서 다운로드
+local: cacert.pem remote: cacert.pem
+200 PORT command successful. Consider using PASV.
+150 Opening BINARY mode data connection for cacert.pem (3550 bytes).
+226 Transfer complete.
+3550 bytes received in 0.00 secs (11517.6 kB/s)
+ftp> get server.pem    ; 서버인증서 다운로드
+local: server.pem remote: server.pem
+200 PORT command successful. Consider using PASV.
+150 Opening BINARY mode data connection for server.crt (1090 bytes).
+226 Transfer complete.
+1090 bytes received in 0.00 secs (3870.7 kB/s)
+ftp> quit
+221 Goodbye.
+
+root@auth:/etc/freeradius/certs# mv cacert.pem ca.pem  ; 루트인증서 이름변경
+
+root@auth:/etc/freeradius/certs# ls -l
+total 20
+-rw-r--r-- 1 root freerad 3550 Aug 13 18:34 ca.pem
+-rw-r--r-- 1 root freerad  245 Aug 13 18:18 dh
+-rw-r--r-- 1 root freerad 1090 Aug 13 18:34 server.pem
+-rw-r--r-- 1 root freerad 1017 Aug 13 18:20 server.csr
+-rw-r--r-- 1 root freerad 1679 Aug 13 18:20 server.key
+
+root@auth:/etc/freeradius/certs# vim /etc/freeradius/eap.conf
+:set nu
+.
+.
+ 26                 #  If the EAP-Type attribute is set by another module,
+ 27                 #  then that EAP type takes precedence over the
+ 28                 #  default type configured here.
+ 29                 #
+ 30                 default_eap_type = peap
+.
+.
+151                 tls {
+152                         #
+153                         #  These is used to simplify later configurations.
+154                         #
+155                         certdir = ${confdir}/certs
+156                         cadir = ${confdir}/certs
+157
+158                         # private_key_password = whatever   ; 인증서 암호 주석처리
+159                         private_key_file = ${certdir}/server.key
+:x
+
+root@auth:/etc/freeradius/certs# vim /etc/freeradius/radiusd.conf
+:set nu
+.
+.
+441         #  allowed values: {no, yes}
+442         #
+443         auth = yes     ; 인증결과가 로그에 남도록 설정
+444
+445         #  Log passwords with the authentication requests.
+446         #  auth_badpass  - logs password if it's rejected
+447         #  auth_goodpass - logs password if it's correct
+448         #
+449         #  allowed values: {no, yes}
+450         #
+451         auth_badpass = yes
+452         auth_goodpass = yes
+:x
+
+root@auth:/etc/freeradius/certs# vim /etc/freeradius/users
+:set nu
+200 # DEFAULT
+201 #       Service-Type = Administrative-User
+202
+203 # On no match, the user is denied access.
+204 user01  Cleartext-Password := "password"     ; test용 계정 생성
+:x
+
+root@auth:/etc/freeradius/certs# service freeradius restart
+Stopping FreeRADIUS daemon: freeradius.
+Starting FreeRADIUS daemon: freeradius.
+
+root@auth:/etc/freeradius/certs# radtest -t mschap user01 password 127.0.0.1:18120 0 testing123    ; 로컬호스트에서 인증 테스트
+Sending Access-Request of id 74 to 127.0.0.1 port 18120
+        User-Name = "user01"
+        NAS-IP-Address = 192.168.11.11
+        NAS-Port = 0
+        MS-CHAP-Challenge = 0x82e874281db440a4
+        MS-CHAP-Response = 0x000100000000000000000000000000000000000000000000000057bfb739c6ffa8040592765ec16eedbc7397d7ca2de6116d
+rad_recv: Access-Accept packet from host 127.0.0.1 port 18120, id=74, length=84
+        MS-CHAP-MPPE-Keys = 0xe52cac67419a9a22166a9e32f11580c1c0b62f9cd0bda6330000000000000000
+        MS-MPPE-Encryption-Policy = 0x00000001
+        MS-MPPE-Encryption-Types = 0x00000006
+
+
+
+root@auth:/etc/freeradius/certs# cat /var/log/freeradius/radius.log
+Tue Aug 13 18:42:15 2013 : Info: Loaded virtual server inner-tunnel
+Tue Aug 13 18:42:15 2013 : Info: Loaded virtual server <default>
+Tue Aug 13 18:42:15 2013 : Info: Ready to process requests.
+Tue Aug 13 18:42:53 2013 : Auth: Login OK: [user01/<via Auth-Type = mschap>] (from client localhost port 0)
+
+root@auth:/etc/freeradius/certs# vim /etc/freeradius/clients.conf    ; NAS 등록
+:set nu
+235 client 211.34.67.1 {
+236         secret          = password
+237         shortname       = C2691
+238 }
+:x
+
+root@auth:/etc/freeradius/certs# service freeradius restart
+Stopping FreeRADIUS daemon: freeradius.
+Starting FreeRADIUS daemon: freeradius.
+
+
+3. Client인증서 생성
+
+root@ca:/home/manager# openssl req -out client.csr -new -newkey rsa:2048 -sha1 -nodes –keyout client.key         ; 클라이언트 인증서 개인키 생성
+Generating a 2048 bit RSA private key
+............................................................................................................................+++
+...+++
+writing new private key to 'client.key'
+-----
+You are about to be asked to enter information that will be incorporated
+into your certificate request.
+What you are about to enter is what is called a Distinguished Name or a DN.
+There are quite a few fields but you can leave some blank
+For some fields there will be a default value,
+If you enter '.', the field will be left blank.
+-----
+Country Name (2 letter code) [AU]:KR
+State or Province Name (full name) [Some-State]:Chungbuk
+Locality Name (eg, city) []:Cheongju
+Organization Name (eg, company) [Internet Widgits Pty Ltd]:Jungsuk
+Organizational Unit Name (eg, section) []:
+Common Name (eg, YOUR name) []:client
+Email Address []:
+
+Please enter the following 'extra' attributes
+to be sent with your certificate request
+A challenge password []:
+An optional company name []:
+
+root@ca:/home/manager# openssl x509 -req -days 365 -in client.csr -CA /etc/ssl/cacert.pem -CAkey /etc/ssl/private/cakey.pem -CAcreateserial -extensions xpclient_ext -extfile xpextensions –out client.pem     ; 클라이언트 인증서 생성
+Signature ok
+subject=/C=KR/ST=Chungbuk/L=Cheongju/O=Jungsuk/CN=client
+Getting CA Private Key
+Enter pass phrase for /etc/ssl/private/cakey.pem:**********  ; 루트인증서 암호
+
+root@ca:/home/manager# openssl pkcs12 -export -clcerts -in client.pem -inkey client.key –out client.p12             ; PEM -> PKCS12 포맷으로 변경
+Enter Export Password:**********    ; client 인증서 암호 생성
+Verifying - Enter Export Password:**********
+
+root@ca:/home/manager# ls -l
+total 32
+-rw-r--r-- 1 root    root    3550 Aug 13 18:24 cacert.pem
+-rw-r--r-- 1 root    root     980 Aug 13 18:51 client.csr
+-rw-r--r-- 1 root    root    1679 Aug 13 18:51 client.key
+-rw-r--r-- 1 root    root    2341 Aug 13 18:53 client.p12
+-rw-r--r-- 1 root    root    1054 Aug 13 18:52 client.pem
+-rw-r--r-- 1 root    root    1090 Aug 13 18:32 server.crt
+-rw-r--r-- 1 manager manager 1017 Aug 13 18:21 server.csr
+-rw-r--r-- 1 manager manager  578 Aug 13 18:29 xpextensions
+
+4. 클라이언트에 인증서 설치
+
+
+“로컬 컴퓨터”의 신뢰할 수 있는 루트인증기관에 루트인증서 등록
+
+
+
+
+
+
+“로컬 컴퓨터” 개인용 인증서에 클라이언트 인증서 등록
+
+
+  반드시 아래 그림과 같이 “확장된 키 사용”에 OID값이 등록되어 있어야 한다.
+
+
+“서비스”에서 유선 802.1x인증이 사용 가능하도록 설정한다.
+
+
+  인증 탭에서 “Microsoft:스마트 카드 또는 기타 인증서” 항목을 선택한다.
+
+
+
+
+
+인증에 성공여부는 스위치에서 아래와 같이 확인 가능하다.
+
+SW2#sh dot1x interface fastEthernet 1/0    ; 스위치에서 인터페이스 확인
+802.1X is enabled on FastEthernet1/0
+  Status                Authorized     ; 허가된 것을 확인 할 수 있다.
+  Port-control          Auto
+  Supplicant            000c.2946.4b09
+  Multiple Hosts        Disallowed
+  Current Identifier    38
+
+5. 스위치 설정
+
+SW2(config)#aaa new-model
+SW2(config)#aaa authentication dot1x default group radius
+SW2(config)#aaa authorization network default group radius
+SW2(config)#radius-server host 210.104.1.1 auth-port 1812 acct-port 1813 key password
+SW2(config)#dot1x system-auth-control
+SW2(config)#interface range fastEthernet 1/0 - 10
+SW2(config-if-range)#dot1x port-control auto
+SW2(config-if-range)#end
+SW2#wr
+
