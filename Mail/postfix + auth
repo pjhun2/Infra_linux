@@ -1,0 +1,85 @@
+
+postfix 설치
+대부분 postfix는 설치되어 있다.
+만약 설치되어 있지 않다면 postfix를 설치해야 한다.
+$ sudo apt-get install postfix ; 설치
+postfix 설정
+$ sudo dpkg-reconfigure postfix ; 환경 설정
+인터넷 사이트(internet site)
+Postfix Configuration : server.com mail.server.com localhost.server.com localhost
+동기 업데이트 설정 Yes/No
+Postfix Configuration : 기본 설정을 그대로 사용
+procmail : yes
+로컬 주소 확장용 문자 : + (기본값)
+메일 폴더 설정
+sudo postconf -e 'home_mailbox = Maildir/'
+procmail은 사용하지 않는것으로 설정
+postfix 초기 설치시 기본설정은 procmail 사용으로 되어있다.
+마약 초기 설치시 procmail 사용으로 설정하였다면 아래와 같이 사용하지 않는것으로 수정할것
+그렇지 않으면 Maildir폴더로 메일이 넘어가지 않는다.
+sudo postconf -e "mailbox_command = "
+
+SASL을 사용하여 SMTP인증을 하기 위한 postfix 설정
+sudo postconf -e 'smtpd_sasl_local_domain ='sudo postconf -e 'smtpd_sasl_auth_enable = yes'sudo postconf -e 'smtpd_sasl_security_options = noanonymous'sudo postconf -e 'broken_sasl_auth_clients = yes'sudo postconf -e 'smtpd_recipient_restrictions = permit_sasl_authenticated,permit_mynetworks,reject_unauth_destination'sudo postconf -e 'inet_interfaces = all'
+/etc/postfix/main.cf에 위의 내용이 저장된다.
+/etc/postfix/sasl/smtpd.conf에 다음 내용 추가
+pwcheck_method: saslauthdmech_list: plain login
+TLS 인크립션과 인증을 위한 인증서 생성
+openssl genrsa -des3 -rand /etc/hosts -out smtpd.key 1024chmod 600 smtpd.keyopenssl req -new -key smtpd.key -out smtpd.csropenssl x509 -req -days 3650 -in smtpd.csr -signkey smtpd.key -out smtpd.crtopenssl rsa -in smtpd.key -out smtpd.key.unencryptedmv -f smtpd.key.unencrypted smtpd.keyopenssl req -new -x509 -extensions v3_ca -keyout cakey.pem -out cacert.pem -days 3650sudo mv smtpd.key /etc/ssl/private/sudo mv smtpd.crt /etc/ssl/certs/sudo mv cakey.pem /etc/ssl/private/sudo mv cacert.pem /etc/ssl/certs/
+들어오고 나가는 메일(incoming &outgoing mail)에 대한 TLS 인크립션 사용을 위해 postfix 설정
+sudo postconf -e 'smtpd_tls_auth_only = no'sudo postconf -e 'smtp_use_tls = yes'sudo postconf -e 'smtpd_use_tls = yes'sudo postconf -e 'smtp_tls_note_starttls_offer = yes'sudo postconf -e 'smtpd_tls_key_file = /etc/ssl/private/smtpd.key'sudo postconf -e 'smtpd_tls_cert_file = /etc/ssl/certs/smtpd.crt'sudo postconf -e 'smtpd_tls_CAfile = /etc/ssl/certs/cacert.pem'sudo postconf -e 'smtpd_tls_loglevel = 1'sudo postconf -e 'smtpd_tls_received_header = yes'sudo postconf -e 'smtpd_tls_session_cache_timeout = 3600s'sudo postconf -e 'tls_random_source = dev:/dev/urandom'sudo postconf -e 'myhostname = server1.example.com'
+postfix demon 재시작
+sudo /etc/init.d/postfix reload
+sasl2 설치(설치되어 있지 않을 경우에)
+클라이언트(xp, 맥, 리눅스, etc)에서 메일을 보내려면 인증절차를 위해 필요합니다.
+$ sudo apt-get install libsasl2 libsasl2-modules sasl2-bin...생략...전에 선택하지 않은 libsasl2 꾸러미를 선택합니다.libsasl2 꾸러미를 푸는 중입니다 (.../libsasl2_2.1.22.dfsg1-18ubuntu2_all.deb에서) ...전에 선택하지 않은 sasl2-bin 꾸러미를 선택합니다.sasl2-bin 꾸러미를 푸는 중입니다 (.../sasl2-bin_2.1.22.dfsg1-18ubuntu2_i386.deb에서) ...db4.6-util (4.6.21-6ubuntu1) 설정하는 중입니다 ...libsasl2 (2.1.22.dfsg1-18ubuntu2) 설정하는 중입니다 ...sasl2-bin (2.1.22.dfsg1-18ubuntu2) 설정하는 중입니다 ...* To enable saslauthd, edit /etc/default/saslauthd and set START=yes
+saslauthd 수정
+$ sudo vi /etc/default/saslauthd
+START를 yes로 수정하고 PWDIR, PARAMS, PIDFILE를 추가
+START=yesPWDIR="/var/spool/postfix/var/run/saslauthd"PARAMS="-m ${PWDIR}"PIDFILE="${PWDIR}/saslauthd.pid"
+그리고 OPTION을 다음과 같이 수정한다.
+OPTIONS="-c -m /var/spool/postfix/var/run/saslauthd"
+/var/spool/postfix/var/run/saslauthd에 대한 dpkg 상태를 업데이트
+dpkg-statoverride --force --update --add root sasl 755 /var/spool/postfix/var/run/saslauthd
+saslauthd 실행
+sudo /etc/init.d/saslauthd start
+부팅시 실행되는/etc/init.d/saslauthd 수정할 필요 없슴
+SMTP가 정상동작하는지 테스트
+$ telnet localhost 25
+Trying 127.0.0.1...
+Connected to localhost.
+Escape character is '^]'.
+220 mail.comingmedia.com ESMTP Postfix (Ubuntu)
+ehlo localhost
+250-mail.comingmedia.com
+250-PIPELINING
+250-SIZE 10240000
+250-VRFY
+250-ETRN
+250-STARTTLS
+250-AUTH PLAIN LOGIN
+250-AUTH=PLAIN LOGIN
+250-ENHANCEDSTATUSCODES
+250-8BITMIME
+250 DSN
+ courier IMAP와 POP3설치
+sudo apt-get install courier-popsudo apt-get install courier-imap
+Maildir 설정
+maildirmake /etc/skel/Maildirmaildirmake /etc/skel/Maildir/.Draftsmaildirmake /etc/skel/Maildir/.Sentmaildirmake /etc/skel/Maildir/.Trashmaildirmake /etc/skel/Maildir/.Templates
+각 사용자에 대해서
+cp -r /etc/skel/Maildir /home/myuser/chown -R myuser:usergroup /home/myuser/Maildirchmod -R 700 /home/myuser/Maildir
+Test
+smtp 테스트
+$ telnet localhost 25Trying 127.0.0.1...Connected to localhost.Escape character is '^]'.220 mail.comingmedia.com ESMTP Postfix (Ubuntu)ehlo yourdomain.com250-mail.yourdomain.com250-PIPELINING250-SIZE 10240000250-VRFY250-ETRN250-STARTTLS250-AUTH PLAIN LOGIN250-AUTH=PLAIN LOGIN250-ENHANCEDSTATUSCODES250-8BITMIME250 DSNmail from: root@yourdomain.com250 2.1.0 Okrcpt to: jhanglim@yourdomain.com250 2.1.5 Okdata354 End data with .Subject: My first mailHi,. (and Enter In a new Line)
+250 2.0.0 Ok: queued as C515B863FCquit221 2.0.0 ByeConnection closed by foreign host.
+jhanglim에게 메일이 정상적으로 도착했는지 확인
+su - fmastercd Maildir/newls
+만약 pop3클라이언트(예 : 선더버드)가 동작하고 있다면 Maildir/new폴더가 아니라 Maildir/cur 폴더에 파일이 있을것이다.
+이유 : 이미 po3클라이언트가 메일을 받아갔으므로 새로운 메세지가 아니다.
+pop3 확인
+$ telnet localhost pop3Trying 127.0.0.1...Connected to localhost.Escape character is '^]'.+OK Hello there.user +OK Password required.pass +OK logged in.
+imap 확인
+$ telnet localhost imapTrying 127.0.0.1...Connected to localhost.Escape character is '^]'.* OK [CAPABILITY IMAP4rev1 UIDPLUS CHILDREN NAMESPACE THREAD=ORDEREDSUBJECT THREAD=REFERENCES SORT QUOTA IDLE ACL ACL2=UNION] Courier-IMAP ready. Copyright 1998-2005 Double Precision, Inc. See COPYING for distribution information.imap login imap OK LOGIN Ok.
+<참조>
+ubuntu help : PostfixBasicSetupHowto
+ubuntu help : Postfix
