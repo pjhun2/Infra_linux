@@ -1,1 +1,42 @@
-#cacti
+1.	Cacti Monitoring
+A.	Install cacti on wsc-i-shizuoka
+ 
+(중간에 DB root계정 비밀번호 설정 해야 함)
+
+B.	Install snmpd on wsc-d-abudhabi
+ 
+
+C.	Configure /etc/snmp/snmpd.conf on wsc-d-abudhabi and restart service
+ 
+
+D.	Configure cacti on wsc-d-helsinki using firefox ( url : http://wsc-i-shizuoka.wsc17.cloud/cacti / default user : admin(DB 패스워드 따라옴) )
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+2.	Ping Monitoring
+A.	Install package on wsc-i-shizuoka
+ 
+ 
+
+B.	Configure /etc/nagios-plugins/config/ping.cfg
+ 
+
+C.	Create /etc/icinga/objects/icmp_icinga.cfg
+ 
+
+D.	Configure /etc/icinga/command.cfg
+ 
+
+E.	Configure /etc/icinga/objects/contacts_icinga.conf
+ 
+
+F.	Configure /etc/icinga/objects/generic-host_icinga.cfg
+ 
+
