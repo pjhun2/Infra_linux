@@ -27,31 +27,87 @@ SSL은 Certificate Authority(CA)라 불리는 서드 파티로부터 서버와 �
 
 CA configure  
 
-/etc/ssl/openssl.cnf 수정  
-CA가 구성될 디렉토리 입력
-Line : 42
-dir = /etc/ca
+리눅스상에서 OpenSSL을 이용한 인증서 발급순서를 살펴보도록 하자.본 예제는 Debian 에서의 작업 순서이며, Centos 도 비슷할거란 생각이 든다. (openssl 명령어를 이용하면 범용적인 사용이 가능하다.)/etc/ssl/openssl.conf를 수정한다.dir = /var/ssl              # Where everything is kept(인증서 저장위치)dir 부분을 /var/ssl 로 수정한다. 루트 인증서는 이곳에 저장이 된다. (기본은 /etc/ssl)
 
-match = 이 값은 인증서를 생성할 때 필수로 입력해야함  
-optional = 입력하지 않아도 됨. 말 그대로 옵션.  
-name = match
-orprovincename = optional
+인증기관(CA) 생성 및 루트 인증서 생성
 
+debian:/usr/lib/ssl/misc# ./CA.pl -newca   # 인증기관을 생성한다.
+                                          # openssl.cnf 를 먼저 설정하고
+                                          # 나서 인증기관을 생성시킨다.
+CA certificate filename (or enter to create) # 상위 인증기관에서 발급받은
+                                     # 인증서를 선택할 수 있으며, 새로 인증기관을
+                                             # 작성하려면 엔터키를 누른다.
+ 
+Making CA certificate ...             
+Generating a 1024 bit RSA private key
+.............++++++
+..................................++++++
+writing new private key to '/var/ssl/private/cakey.pem'  # 개인키가 저장되는
+                                              #  디렉토리 openssl.cnf에 설정
+Enter PEM pass phrase:     # 앞으로 발급하는 인증서는 개인키로 서명을 해야 한다.
+                              # 따라서 비밀번호를 입력해 놓는다.
+Verifying - Enter PEM pass phrase:  # 개인키 비밀번호 확인작업
+-----
+You are about to be asked to enter information that will be incorporated
+into your certificate request.
+What you are about to enter is what is called a Distinguished Name or a DN.
+There are quite a few fields but you can leave some blank
+For some fields there will be a default value,
+If you enter '.', the field will be left blank.
+-----
+Country Name (2 letter code) [KR]:     # 국가코드
+State or Province Name (full name) [Seoul]:   # 특별시,직할시,도
+Locality Name (eg, city) []:DongDaeMun-Gu   # 시, 군, 구
+Organization Name (eg, company) []:HackersCollege   # 회사이름
+Organizational Unit Name (eg, section) []:HCNE   # 부서이름
+Common Name (eg, YOUR name) []:HackersCollege Network Expert # 인증서 이름
+Email Address []:master@hcne.net  # E-mail, 인증기관 관리자를 보통 적는다.
+ 
+Please enter the following 'extra' attributes
+to be sent with your certificate request
+A challenge password []:    # 입력하지 않고 비워둔다.
+An optional company name []:        # 입력하지 않고 비워둔다.
+Using configuration from /usr/lib/ssl/openssl.cnf
+Enter pass phrase for /var/ssl/private/cakey.pem:  # 루트인증서를 발급하는
+                                # 과정이다. 위에서 적었던 개인키 암호를 입력한다.
+Check that the request matches the signature
+Signature ok
+Certificate Details:
+        Serial Number:
+            c5:02:42:ef:31:08:ec:d9
+        Validity
+            Not Before: Jan 22 10:59:54 2008 GMT
+            Not After : Jan 21 10:59:54 2011 GMT
+        Subject:
+            countryName               = KR
+            stateOrProvinceName       = Seoul
+            organizationName          = HackersCollege
+            organizationalUnitName    = HCNE
+            commonName                = HackersCollege Network Expert
+            emailAddress              = master@hcne.net
+        X509v3 extensions:
+            X509v3 Subject Key Identifier:
+ EE:95:DC:86:D6:B7:41:63:CD:EB:07:7E:0B:0D:37:0E:EF:03:7E:5A
+            X509v3 Authority Key Identifier:
+                keyid:EE:95:DC:86:D6:B7:41:63:CD:EB:07:7E:0B:0D:37:0E:EF:03:7E:5A
+                DirName:/C=KR/ST=Seoul/O=HackersCollege/OU=HCNE/CN=HackersCollege Network Expert/emailAddress=master@hcne.net
+                serial:C5:02:42:EF:31:08:EC:D9
+ 
+            X509v3 Basic Constraints:
+                CA:TRUE
+Certificate is to be certified until Jan 21 10:59:54 2011 GMT (1095 days)
+Write out database with 1 new entries
+Data Base Updated  # /var/ssl 디렉토리에 가보면 생성되어 있는것을 확인할 수 있다.
+ 
 
-Default로 Some-state가 들어가지 않도록 주석  
-#stateOrProvinceName_default = Some-State
+인증기관 생성및 루트인증서 생성이 완료되었다.
+순서를 다시 설명하면 처음 인증기관을 만들고,, 개인키와 공개키를 생성한다. 인증서에 포함될 필드를 작성한 다음 생성된 공개키를 포함해서 개인키로 서명을 하면 인증서가 생성된다.
+이렇게 작성된 인증서는 실제 인터넷상에서 사용되는 인증서의 내용이외의 정보가 포함이 되어 있기 때문에 다시 한번 필요한 부분만 잘라내는 작업이 필요하다.
+루트 인증서 가공
 
-organizationName 값으로 들어갈 값을 입력  
-O.organizationName_deafult = Test infomation
+debian:/var/ssl# openssl x509 -in cacert.pem -out cacert.crt
+초기에 만들어진 인증서를 확인해보면(이경우 cacert.pem) 인증서를 비롯해서 다른 많은 정보가 저장이 되어 있으므로 실제로 인터넷상에서 사용하기 위해서는 인증서 부분만 발췌하는 작업이 필요하다.(제거하지 않고 그대로 사용해도 상관없다.)
+위의 명령어는 실제 인터넷상에서 사용가능한 루트 인증서로 가공하는 작업을 해주며, 최종적으로cacert.crt라는 루트 인증서가 생성된다.
+생성된 cacert.crt는 클라이언트에 설치할 목적으로 배포하면 된다.
 
-/usr/lib/ssl/misc/CA.pl 인증서를 생성하기 윈 스크맅트에 CA가 구성될 디렉토리 값을 수정  
-line : 37
-/etc/ca
-
-
-/usr/lib/ssl/misc/CA.pl -newca 명령어로 자동 인증서 생성  
-
-
-인증서는 DNS와 같이 최상위 인증기관이 존재하며 도메인에서 .과 같은 역할을 하는 서버들이 있다.  
-하위 인증 기관 -> 최상위 인증기관 순으로 질의되어 인증서가 존재되고  
-우리가 실제로 웹 브라우저에 접속해서 https 사이트를 사용할 때 인증서에를 보면 아래부터 위로 올라가는 그림을 볼 수 있는데 이런 것이 하위 -> 상위로 인증되는 순서이다.
+인증기관이 생성되면 인증서를 관리하기 위한 시리얼 넘버 등 다양한 정보들이 같이 생성이 된다. openssl 명령어를 이용해서 수동으로 루트 인증서를 작성할때에는 인증기관의 모든 구성정보를 수동으로 작성해야 한다. 따라서, 인증기관을 설치시에는 CA.pl 유틸리티를 활용하기 바란다. 인증기관이 설치된 이후에 openssl 명령어를 사용해서 인증서를 생성할 때에는 자동으로 시리얼 넘버등이 추가된다.
