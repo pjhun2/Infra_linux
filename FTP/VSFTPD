@@ -378,4 +378,4 @@ umask에 대한 설명은 local_mask의 설명을 참조하시기 바랍니다.
  
 chown_username=whoever (기본값 = root)
 익명 사용자의 소유권 변경이 가능한 계정명을 설정합니다.
-출처 : Tong - bassdot님의 리
+출처 : Tong - bassdot님의 리눅스통
