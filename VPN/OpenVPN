@@ -1,0 +1,202 @@
+openvpn:~# apt-get install openvpn lzop패키지 목록을 읽는 중입니다... 완료의존성 트리를 만드는 중입니다상태 정보를 읽는 중입니다... 완료다음 패키지를 더 설치할 것입니다:  liblzo2-2 libpkcs11-helper1 openvpn-blacklist제안하는 패키지:  resolvconf다음 새 패키지를 설치할 것입니다:  liblzo2-2 libpkcs11-helper1 lzop openvpn openvpn-blacklist0개 업그레이드, 5개 새로 설치, 0개 지우기 및 0개 업그레이드 안 함.0바이트/1616k바이트 아카이브를 받아야 합니다.이 작업 후 3695k바이트의 디스크 공간을 더 사용하게 됩니다.계속 하시겠습니까 [Y/n]? y패키지를 미리 설정하는 중입니다...전에 선택하지 않은 liblzo2-2 패키지를 선택합니다.(데이터베이스 읽는중 ...현재 89735개의 파일과 디렉토리가 설치되어 있습니다.)liblzo2-2 패키지를 푸는 중입니다 (.../lzo2/liblzo2-2_2.03-1_i386.deb에서) ...전에 선택하지 않은 libpkcs11-helper1 패키지를 선택합니다.libpkcs11-helper1 패키지를 푸는 중입니다 (.../libpkcs11-helper1_1.05-1_i386.deb에서) ...전에 선택하지 않은 lzop 패키지를 선택합니다.lzop 패키지를 푸는 중입니다 (.../lzop/lzop_1.02~rc1-2_i386.deb에서) ...전에 선택하지 않은 openvpn-blacklist 패키지를 선택합니다.openvpn-blacklist 패키지를 푸는 중입니다 (.../openvpn-blacklist_0.3_all.deb에서) ...전에 선택하지 않은 openvpn 패키지를 선택합니다.openvpn 패키지를 푸는 중입니다 (.../openvpn_2.1~rc11-1_i386.deb에서) ...man-db에 대한 트리거를 처리하는 중입니다 ...liblzo2-2 (2.03-1) 설정하는 중입니다 ...libpkcs11-helper1 (1.05-1) 설정하는 중입니다 ...lzop (1.02~rc1-2) 설정하는 중입니다 ...openvpn-blacklist (0.3) 설정하는 중입니다 ...openvpn (2.1~rc11-1) 설정하는 중입니다 ...Restarting virtual private network daemon.:.
+ 
+openvpn:~# cd /usr/share/doc/openvpn/examples/sample-config-files/
+openvpn:/usr/share/doc/openvpn/examples/sample-config-files# gunzip server.conf.gz
+openvpn:/usr/share/doc/openvpn/examples/sample-config-files# cp server.conf /etc/openvpn/openvpn.conf
+openvpn:/usr/share/doc/openvpn/examples/sample-config-files# cd ../
+openvpn:/usr/share/doc/openvpn/examples# cp -a sample-keys/ /etc/openvpn/keys
+openvpn:/usr/share/doc/openvpn/examples# cd /etc/openvpn
+openvpn:/etc/openvpn# vim openvpn.conf
+----------------------- 중략 ----------------------------# use the same ca file.## See the "easy-rsa" directory for a series# of scripts for generating RSA certificates# and private keys.  Remember to use# a unique Common Name for the server# and each of the client certificates.## Any X509 key management system can be used.# OpenVPN can also use a PKCS #12 formatted key file# (see "pkcs12" directive in man page).ca ca.crtcert server.crtkey server.key  # This file should be kept secret
+# Diffie hellman parameters.# Generate your own with:#   openssl dhparam -out dh1024.pem 1024# Substitute 2048 for 1024 if you are using# 2048 bit keys.dh dh1024.pem----------------------- 중략 ----------------------------
+ 
+아래와 같이 수정한다.
+ 
+----------------------- 중략 ----------------------------# use the same ca file.## See the "easy-rsa" directory for a series# of scripts for generating RSA certificates# and private keys.  Remember to use# a unique Common Name for the server# and each of the client certificates.## Any X509 key management system can be used.# OpenVPN can also use a PKCS #12 formatted key file# (see "pkcs12" directive in man page).ca /etc/openvpn/keys/ca.crtcert /etc/openvpn/keys/server.crtkey /etc/openvpn/keys/server.key  # This file should be kept secret
+# Diffie hellman parameters.# Generate your own with:#   openssl dhparam -out dh1024.pem 1024# Substitute 2048 for 1024 if you are using# 2048 bit keys.dh /etc/openvpn/keys/dh1024.pem----------------------- 중략 ----------------------------
+ 
+VPN Subnet을 과제에서 주어진 네트워크로 변경한다.
+----------------------- 중략 ----------------------------# Configure server mode and supply a VPN subnet# for OpenVPN to draw client addresses from.# The server will take 10.8.0.1 for itself,# the rest will be made available to clients.# Each client will be able to reach the server# on 10.8.0.1. Comment this line out if you are# ethernet bridging. See the man page for more info.server 10.8.0.0 255.255.255.0 ----------------------- 중략 ----------------------------
+ 
+openvpn:/etc/openvpn# /etc/init.d/openvpn restartStopping virtual private network daemon:.Starting virtual private network daemon: openvpn.
+ 
+openvpn:/etc/openvpn# ifconfigeth0      Link encap:Ethernet  HWaddr 00:0c:29:4a:de:40          inet addr:192.168.100.254  Bcast:192.168.100.255  Mask:255.255.255.0          inet6 addr: fe80::20c:29ff:fe4a:de40/64 Scope:Link          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1          RX packets:2569 errors:0 dropped:0 overruns:0 frame:0          TX packets:2430 errors:0 dropped:0 overruns:0 carrier:0          collisions:0 txqueuelen:1000          RX bytes:234604 (229.1 KiB)  TX bytes:375397 (366.5 KiB)          Interrupt:19 Base address:0x2000
+lo        Link encap:Local Loopback          inet addr:127.0.0.1  Mask:255.0.0.0          inet6 addr: ::1/128 Scope:Host          UP LOOPBACK RUNNING  MTU:16436  Metric:1          RX packets:52 errors:0 dropped:0 overruns:0 frame:0          TX packets:52 errors:0 dropped:0 overruns:0 carrier:0          collisions:0 txqueuelen:0          RX bytes:3976 (3.8 KiB)  TX bytes:3976 (3.8 KiB)
+tun0      Link encap:UNSPEC  HWaddr 00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00          inet addr:10.8.0.1  P-t-P:10.8.0.2  Mask:255.255.255.255          UP POINTOPOINT RUNNING NOARP MULTICAST  MTU:1500  Metric:1          RX packets:0 errors:0 dropped:0 overruns:0 frame:0          TX packets:0 errors:0 dropped:0 overruns:0 carrier:0          collisions:0 txqueuelen:100          RX bytes:0 (0.0 B)  TX bytes:0 (0.0 B)
+ Windows Client 설정
+ 
+우선 http://www.openvpn.net 에 접속하여 윈도우용 설치 프로그램을 다운로드 합니다.
+ 
+다운로드한 "openvpn-2.1.1-install.exe" 파일을 더블클릭하여 아래의 절차에 따라 설치합니다.
+ 
+
+ 
+
+
+ 
+
+ 만약, 32bit버젼의 윈도우를 사용하신다면 설치 경로가 다를 수 있습니다.
+ 
+
+ 
+
+ 
+
+ 
+설치가 완료되면 OpenVPN의 "/etc/openvpn/keys"  폴더에서 루트인증서와 클라이언트 인증서를 "C:\Program files (x86)\config" 폴더에 저장하도록 합니다.  아울러 아래 그림과 같이 "C:\Program files (x86)\sample-config" 폴더의 "client.ovpn" 파일을 "C:\Program files (x86)\config" 폴더에 복사 또는 이동하도록 합니다.
+ 
+
+ 
+
+ 
+위 그림과 같이 3개의 인증서 파일과 클라이언트 설정파일이 정확하게 존재하여야 합니다.  
+ 
+이제 바탕화면에 설치된 "OpenVPN GUI" 단축아이콘을 클릭하여 OpenVPN를 구동하도록 합니다.
+ 
+작업표시줄 우측하단 (시계가 표시되는 곳)에 "OpenVPN GUI" 아이콘을 마우스 오른쪽 버튼으로 클릭하여 클라이언트 설정파일을
+ 
+편집하도록 하겠습니다.
+ 
+
+ 
+설정파일의 본문 내용중 서버 IP 설정부분에 OpenVPN이 설치되어 있는 서버의 IP를 입력하도록 합니다.
+ 
+# The hostname/IP and port of the server.# You can have multiple remote entries# to load balance between the servers.remote 192.168.100.254 1194      # 요기에 서버의 IP를 입력하였습니다.;remote my-server-2 1194
+ 
+이제 설정파일을 저장하고 다시  작업표시줄의 OpenVPN GUI 아이콘을 오른쪽 마우스로 클릭하여 "Connect" 메뉴를 클릭하여 서버에 접속하도록 합니다.
+ 
+
+ 
+
+ 
+ 
+모든 설정에 이상이 없다면 아래와 같이 OpenVPN GUI아이콘이 적색->노랑색->녹색으로 변경되면서 서버에서 제공하는 IP를 할당받는 것을 확인할 수 있습니다.
+ 
+
+ 
+이제 "CMD"창에서 "ipconfig" 명령을 입력하면 할당된 IP정보를 확인할 수 있습니다.
+ 
+
+ 
+서버의 VPN인터페이스에 ping 테스트 해 보도록 하겠습니다.
+ 
+
+ 
+서버로 부터 응답이 오는 것을 확인할 수 있죠?
+ 
+요기까지 가장 일반적이고 간단한 OpenVPN설치 과정이었습니다.
+ OpenVPN 클라이언트 인증서 없이 시스템 계정으로 인증하기
+
+앞서 OpenVPN설치시 인증서는 기본적으로 제공되는 샘플인증서를 사용하였는데 이번에는 인증서를 직접 생성하도록 한다.
+ 
+openvpn:~# cd /usr/share/doc/openvpn/examples/easy-rsa/2.0/
+openvpn:/usr/share/doc/openvpn/examples/easy-rsa/2.0# vim vars
+:set nu     61 # These are the default values for fields     62 # which will be placed in the certificate.     63 # Don't leave any of these fields blank.     64 export KEY_COUNTRY="US"              65 export KEY_PROVINCE="CA"     66 export KEY_CITY="SanFrancisco"     67 export KEY_ORG="Fort-Funston"     68 export KEY_EMAIL="me@myhost.mydomain"
+아래와 같이 수정해 봅시다.     61 # These are the default values for fields     62 # which will be placed in the certificate.     63 # Don't leave any of these fields blank.     64 export KEY_COUNTRY="KR"                               # 국가코드 한국은 "KR"     65 export KEY_PROVINCE="Chungbuk"                    # 필자가 거주하는 지역 충북 "Chungbuk"     66 export KEY_CITY="Cheongju"                                # 필자가 거주하는 청주시 "Cheongju"     67 export KEY_ORG="Jungsuk"                                   # 필자가 소속된 회사이름 "Jungsuk"     68 export KEY_EMAIL=jhlee@jungsuk.net                 # 관리자 전자우편 "jhlee@jungsuk.net"
+:x
+ 
+openvpn:/usr/share/doc/openvpn/examples/easy-rsa/2.0# source ./vars      # 수정한 환경변수를 쉘에 적용합니다.NOTE: If you run ./clean-all, I will be doing a rm -rf on /usr/share/doc/openvpn/examples/easy-rsa/2.0/keys
+openvpn:/usr/share/doc/openvpn/examples/easy-rsa/2.0# ./clean-all          # 기존에 생성되어 있었던 모든 키를 삭제
+openvpn:/usr/share/doc/openvpn/examples/easy-rsa/2.0# ./build-ca           # 루트인증서를 생성합니다.  Generating a 1024 bit RSA private key....++++++...............++++++writing new private key to 'ca.key'-----You are about to be asked to enter information that will be incorporatedinto your certificate request.What you are about to enter is what is called a Distinguished Name or a DN.There are quite a few fields but you can leave some blankFor some fields there will be a default value,If you enter '.', the field will be left blank.-----Country Name (2 letter code) [KR]:State or Province Name (full name) [Chungbuk]:Locality Name (eg, city) [Cheongju]:Organization Name (eg, company) [Jungsuk]:Organizational Unit Name (eg, section) []:SalesCommon Name (eg, your name or your server's hostname) [Jungsuk CA]:Email Address [jhlee@jungsuk.net]:
+openvpn:/usr/share/doc/openvpn/examples/easy-rsa/2.0# ./build-key-server server     # 서버인증서 생성합니다.Generating a 1024 bit RSA private key......................++++++...++++++writing new private key to 'server.key'-----You are about to be asked to enter information that will be incorporatedinto your certificate request.What you are about to enter is what is called a Distinguished Name or a DN.There are quite a few fields but you can leave some blankFor some fields there will be a default value,If you enter '.', the field will be left blank.-----Country Name (2 letter code) [KR]:State or Province Name (full name) [Chungbuk]:Locality Name (eg, city) [Cheongju]:Organization Name (eg, company) [Jungsuk]:Organizational Unit Name (eg, section) []:SalesCommon Name (eg, your name or your server's hostname) [server]:Email Address [jhlee@jungsuk.net]:
+Please enter the following 'extra' attributesto be sent with your certificate requestA challenge password []:An optional company name []:Using configuration from /usr/share/doc/openvpn/examples/easy-rsa/2.0/openssl.cnfCheck that the request matches the signatureSignature okThe Subject's Distinguished Name is as followscountryName           :PRINTABLE:'KR'stateOrProvinceName   :PRINTABLE:'Chungbuk'localityName          :PRINTABLE:'Cheongju'organizationName      :PRINTABLE:'Jungsuk'organizationalUnitName:PRINTABLE:'Sales'commonName            :PRINTABLE:'server'emailAddress          :IA5STRING:'jhlee@jungsuk.net'Certificate is to be certified until Jan 22 11:16:47 2020 GMT (3650 days)Sign the certificate? [y/n]: y
+ 
+1 out of 1 certificate requests certified, commit? [y/n] yWrite out database with 1 new entriesData Base Updated
+ 
+freeradius:/usr/share/doc/openvpn/examples/easy-rsa/2.0# ./build-dh        # Diffie Hellman 키 생성Generating DH parameters, 1024 bit long safe prime, generator 2This is going to take a long time.................+...........................+..............................................+............................+.......+...................+..............................................................++*++*++*
+우리는 시스템 계정을 통하여 인증할 예정이므로 클라이언트 인증서는 생성하지 않습니다.
+ 
+만약, 클라인증서가 필요하다면 "./build-key client" 와 같이 명령을 실행하면 "client"라는 클라이언트 인증서가 생성됩니다.
+ 
+이제 모든 인증관련 파일이 생성되었으므로 인증서 폴더를 "/etc/openvpn" 폴더로 복사 또는 이동하도록 하겠습니다.
+ 
+openvpn:/usr/share/doc/openvpn/examples/easy-rsa/2.0# cp -a keys /etc/openvpn
+openvpn:~# vim /etc/openvpn/openvpn.conf       # openvpn.conf 파일을 수정하도록 합니다.
+ 
+:set nu
+     75 # Any X509 key management system can be used.     76 # OpenVPN can also use a PKCS #12 formatted key file     77 # (see "pkcs12" directive in man page).     78 ca /etc/openvpn/keys/ca.crt     79 cert /etc/openvpn/keys/server.crt     80 key /etc/openvpn/keys/server.key  # This file should be kept secret     81     82 # Diffie hellman parameters.     83 # Generate your own with:     84 #   openssl dhparam -out dh1024.pem 1024     85 # Substitute 2048 for 1024 if you are using     86 # 2048 bit keys.     87 dh /etc/openvpn/keys/dh1024.pem----------------------------------- 중략 ------------------------------------------------------
+     89 # Configure server mode and supply a VPN subnet     90 # for OpenVPN to draw client addresses from.     91 # The server will take 10.8.0.1 for itself,     92 # the rest will be made available to clients.     93 # Each client will be able to reach the server     94 # on 10.8.0.1. Comment this line out if you are     95 # ethernet bridging. See the man page for more info.     96 server 10.8.0.0 255.255.255.0----------------------------------- 중략 ------------------------------------------------------
+    198 # Uncomment this directive to allow different    199 # clients to be able to "see" each other.    200 # By default, clients will only see the server.    201 # To force clients to only see the server, you    202 # will also need to appropriately firewall the    203 # server's TUN/TAP interface.    204 client-to-client          # VPN 클라이언트 상호간에 통신을 허용한다면 주석을 해제한다.
+----------------------------------- 중략 ------------------------------------------------------
+    213 # IF YOU HAVE NOT GENERATED INDIVIDUAL    214 # CERTIFICATE/KEY PAIRS FOR EACH CLIENT,    215 # EACH HAVING ITS OWN UNIQUE "COMMON NAME",    216 # UNCOMMENT THIS LINE OUT.    217 duplicate-cn              # 동일한 인증서로 중복 접속을 허용한다면 주석을 해제한다.----------------------------------- 중략 ------------------------------------------------------
+   277 # By default, log messages will go to the syslog (or    278 # on Windows, if running as a service, they will go to    279 # the "\Program Files\OpenVPN\log" directory).    280 # Use log or log-append to override this default.    281 # "log" will truncate the log file on OpenVPN startup,    282 # while "log-append" will append to it.  Use one    283 # or the other (but not both).    284 log         openvpn.log    285 log-append  openvpn.log       # 로그를 기록하도록 한다.-------------------------- 중략 ------------------------------------------------------
+    296 # Silence repeating messages.  At most 20    297 # sequential messages of the same message    298 # category will be output to the log.    299 ;mute 20    300 plugin /usr/lib/openvpn/openvpn-auth-pam.so login  # 사용자 인증을 위한 plug-in 파일의 위치 지정    301 client-cert-not-required                      # client 인증서를 요청하지 않도록 설정    302 username-as-common-name
+:x
+ 
+openvpn:~# /etc/init.d/openvpn restartStopping virtual private network daemon:.Starting virtual private network daemon: openvpn.
+ 
+윈도우 클라이언트 설정
+ 
+"c:\program files (x86)\openvpn\config" 폴더에 루트인증서와 설정파일을 복사한다.
+ 
+
+ 
+ 
+클라이언트 인증서 파일의 내용을 아래와 같이 수정한다.
+ 
+-------------------------- 중략 ------------------------------------------------------
+# The hostname/IP and port of the server.# You can have multiple remote entries# to load balance between the servers.remote 192.168.100.254 1194                              # VPN서버 IP를 설정;remote my-server-2 1194 
+-------------------------- 중략 ------------------------------------------------------
+# SSL/TLS parms.# See the server config file for more# description.  It's best to use# a separate .crt/.key file pair# for each client.  A single ca# file can be used for all clients.auth-user-pass                                                   # 시스템 사용자 인증 요청ca ca.crt                                                         # 루트 인증서 위치
+-------------------------- 중략 ------------------------------------------------------
+# Silence repeating messages;mute 20ping 10                     # 접속이 자동해제 되는 것을 방지하기 위해 10초 간격으로 ping
+ 
+시스템 계정으로 로그인 시도
+ 
+
+ 
+ 
+
+ 
+성공적으로 로그인되면 작업표시줄의 "OpenVPN GUI" 아이콘이 녹색으로 변경된다.
+Bridge 기반의 OpenVPN 서비스 설정하기
+
+openvpn:~# apt-get install bridge-utils패키지 목록을 읽는 중입니다... 완료의존성 트리를 만드는 중입니다상태 정보를 읽는 중입니다... 완료다음 새 패키지를 설치할 것입니다:  bridge-utils0개 업그레이드, 1개 새로 설치, 0개 지우기 및 0개 업그레이드 안 함.0바이트/31.2k바이트 아카이브를 받아야 합니다.이 작업 후 111k바이트의 디스크 공간을 더 사용하게 됩니다.미디어 바꾸기: '/cdrom/' 드라이브에 다음 레이블이 달린디스크를 넣고 enter를 누르십시오 'Debian GNU/Linux 5.0.3 _Lenny_ - Official i386 DVD Binary-1 20090905-08:48'
+전에 선택하지 않은 bridge-utils 패키지를 선택합니다.(데이터베이스 읽는중 ...현재 90609개의 파일과 디렉토리가 설치되어 있습니다.)bridge-utils 패키지를 푸는 중입니다 (.../bridge-utils_1.4-5_i386.deb에서) ...man-db에 대한 트리거를 처리하는 중입니다 ...bridge-utils (1.4-5) 설정하는 중입니다 ...
+openvpn:~# cp /usr/share/doc/openvpn/examples/sample-scripts/bridge-* /etc/openvpnopenvpn:~#cd /etc/openvpnopenvpn:/etc/openvpn# vim bridge-start:set nu
+----------------------------------- 중략 ------------------------------------------ 
+    15 # Define physical ethernet interface to be bridged     16 # with TAP interface(s) above.     17 eth="eth1"                               #  bridge에 사용될 인터페이스명을 입력한다.     18 eth_ip="172.16.0.254"      19 eth_netmask="255.255.255.0"     20 eth_broadcast="172.16.0.255"----------------------------------- 중략 ------------------------------------------
+:x
+ 
+openvpn:/etc/openvpn# ./bridge-startWed Feb  3 04:10:11 2010 TUN/TAP device tap0 openedWed Feb  3 04:10:11 2010 Persist state set to: ON
+openvpn:/etc/openvpn# ifconfigbr0       Link encap:Ethernet  HWaddr 00:0c:29:4a:de:40          inet addr:172.16.0.254  Bcast:172.16.0.255  Mask:255.255.255.0          inet6 addr: fe80::20c:29ff:fe4a:de40/64 Scope:Link          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1          RX packets:26 errors:0 dropped:0 overruns:0 frame:0          TX packets:44 errors:0 dropped:0 overruns:0 carrier:0          collisions:0 txqueuelen:0          RX bytes:1868 (1.8 KiB)  TX bytes:7487 (7.3 KiB)
+eth0      Link encap:Ethernet  HWaddr 00:0c:29:4a:de:4a          inet addr:192.168.100.254  Bcast:192.168.100.255  Mask:255.255.255.0          inet6 addr: fe80::20c:29ff:fe4a:de4a/64 Scope:Link          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1          RX packets:2276 errors:0 dropped:0 overruns:0 frame:0          TX packets:1694 errors:0 dropped:0 overruns:0 carrier:0          collisions:0 txqueuelen:1000          RX bytes:267421 (261.1 KiB)  TX bytes:258121 (252.0 KiB)          Interrupt:18 Base address:0x2000
+eth1      Link encap:Ethernet  HWaddr 00:0c:29:4a:de:40          inet6 addr: fe80::20c:29ff:fe4a:de40/64 Scope:Link          UP BROADCAST RUNNING PROMISC MULTICAST  MTU:1500  Metric:1          RX packets:2143 errors:0 dropped:0 overruns:0 frame:0          TX packets:275 errors:0 dropped:0 overruns:0 carrier:0          collisions:0 txqueuelen:1000          RX bytes:217927 (212.8 KiB)  TX bytes:33481 (32.6 KiB)          Interrupt:19 Base address:0x2080
+lo        Link encap:Local Loopback          inet addr:127.0.0.1  Mask:255.0.0.0          inet6 addr: ::1/128 Scope:Host          UP LOOPBACK RUNNING  MTU:16436  Metric:1          RX packets:87 errors:0 dropped:0 overruns:0 frame:0          TX packets:87 errors:0 dropped:0 overruns:0 carrier:0          collisions:0 txqueuelen:0          RX bytes:7817 (7.6 KiB)  TX bytes:7817 (7.6 KiB)
+tap0      Link encap:Ethernet  HWaddr 00:ff:11:07:bf:d6          inet6 addr: fe80::2ff:11ff:fe07:bfd6/64 Scope:Link          UP BROADCAST RUNNING PROMISC MULTICAST  MTU:1500  Metric:1          RX packets:0 errors:0 dropped:0 overruns:0 frame:0          TX packets:0 errors:0 dropped:49 overruns:0 carrier:0          collisions:0 txqueuelen:100          RX bytes:0 (0.0 B)  TX bytes:0 (0.0 B)
+ 
+openvpn:/etc/openvpn# vim /etc/openvpn/openvpn.conf
+ 
+ ----------------------------------- 중략 ------------------------------------------ 
+     38 # "dev tun" will create a routed IP tunnel,     39 # "dev tap" will create an ethernet tunnel.     40 # Use "dev tap0" if you are ethernet bridging     41 # and have precreated a tap0 virtual interface     42 # and bridged it with your ethernet interface.     43 # If you want to control access policies     44 # over the VPN, you must create firewall     45 # rules for the the TUN/TAP interface.     46 # On non-Windows systems, you can give     47 # an explicit unit number, such as tun0.     48 # On Windows, use "dev-node" for this.     49 # On most systems, the VPN will not function     50 # unless you partially or fully disable     51 # the firewall for the TUN/TAP interface.     52 dev tap0     53 ;dev tun
+----------------------------------- 중략 ------------------------------------------
+ 
+----------------------------------- 중략 ------------------------------------------
+     89 # Configure server mode and supply a VPN subnet     90 # for OpenVPN to draw client addresses from.     91 # The server will take 10.8.0.1 for itself,     92 # the rest will be made available to clients.     93 # Each client will be able to reach the server     94 # on 10.8.0.1. Comment this line out if you are     95 # ethernet bridging. See the man page for more info.     96;server 10.8.0.0 255.255.255.0
+----------------------------------- 중략 ------------------------------------------
+ 
+----------------------------------- 중략 ------------------------------------------
+    105 # Configure server mode for ethernet bridging.    106 # You must first use your OS's bridging capability    107 # to bridge the TAP interface with the ethernet    108 # NIC interface.  Then you must manually set the    109 # IP/netmask on the bridge interface, here we    110 # assume 10.8.0.4/255.255.255.0.  Finally we    111 # must set aside an IP range in this subnet    112 # (start=10.8.0.50 end=10.8.0.100) to allocate    113 # to connecting clients.  Leave this line commented    114 # out unless you are ethernet bridging.    115 server-bridge 172.16.0.254 255.255.255.0 172.16.0.1 172.16.0.100
+----------------------------------- 중략 ------------------------------------------ 
+openvpn:/etc/openvpn# /etc/init.d/openvpn startStarting virtual private network daemon: openvpn.
+ 
+ 
+만약, OpenVPN서버에 별도의 DHCP서버가 실행중에 있다면
+ 
+ 
+----------------------------------- 중략 ------------------------------------------
+     98 # Maintain a record of client <-> virtual IP address     99 # associations in this file.  If OpenVPN goes down or    100 # is restarted, reconnecting clients can be assigned    101 # the same virtual IP address from the pool that was    102 # previously assigned.    103 ;ifconfig-pool-persist ipp.txt
+----------------------------------- 중략 ------------------------------------------
+ 
+----------------------------------- 중략 ------------------------------------------
+    105 # Configure server mode for ethernet bridging.    106 # You must first use your OS's bridging capability    107 # to bridge the TAP interface with the ethernet    108 # NIC interface.  Then you must manually set the    109 # IP/netmask on the bridge interface, here we    110 # assume 10.8.0.4/255.255.255.0.  Finally we    111 # must set aside an IP range in this subnet    112 # (start=10.8.0.50 end=10.8.0.100) to allocate    113 # to connecting clients.  Leave this line commented    114 # out unless you are ethernet bridging.    115 ;server-bridge 172.16.0.254 255.255.255.0 172.16.0.1 172.16.0.100----------------------------------- 중략 ------------------------------------------
+ 
+----------------------------------- 중략 ------------------------------------------    117 # Configure server mode for ethernet bridging    118 # using a DHCP-proxy, where clients talk    119 # to the OpenVPN server-side DHCP server    120 # to receive their IP address allocation    121 # and DNS server addresses.  You must first use    122 # your OS's bridging capability to bridge the TAP    123 # interface with the ethernet NIC interface.    124 # Note: this mode only works on clients (such as    125 # Windows), where the client-side TAP adapter is    126 # bound to a DHCP client.    127 server-bridge----------------------------------- 중략 ------------------------------------------
+ 
+ 
+ 
+클라이언트 설정은 아래 부분만 수정
+ 
+# Use the same setting as you are using on# the server.# On most systems, the VPN will not function# unless you partially or fully disable# the firewall for the TUN/TAP interface.dev tap0;dev tun
+ 
+ 기타 설정은 앞서 설명한 자료를 참고 바랍니다.
