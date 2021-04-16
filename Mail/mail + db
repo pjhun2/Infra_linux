@@ -1,0 +1,219 @@
+1. DNS
+atreia.org         MX      10      atreia.org
+atreia.org         MX      10      12.34.56.78
+mail.atreia.org    MX      10      12.34.56.78
+
+2. SSL
+CA인증서, 서버인증서, 서버인증서키를 준비합니다.
+
+3. Pakages
+#apt-get install postfix postfix-mysql dovecot-core dovecot-imapd dovecot-pop3d dovecot-lmtpd dovecot-mysql mysql-server
+
+4. Mysql
+### DB, 유저, TABLE은 상황에 맞게 수정 ###
+1. DB를 생성합니다.
+#mysqladmin -p create mailserver
+
+2. 인증에 관련된 쿼리를 날릴 계정을 생성합니다.
+mysql> GRANT SELECT ON mailserver.* TO 'mailuser'@'127.0.0.1' IDENTIFIED BY 'mailuserpass';
+mysql> FLUSH PRIVILEGES;
+
+3. 테이블 생성 (도메인, 유저, ALIASES)
+CREATE TABLE `virtual_domains` (
+  `id` int(11) NOT NULL auto_increment,
+  `name` varchar(50) NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+CREATE TABLE `virtual_users` (
+  `id` int(11) NOT NULL auto_increment,
+  `domain_id` int(11) NOT NULL,
+  `password` varchar(106) NOT NULL,
+  `email` varchar(100) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `email` (`email`),
+  FOREIGN KEY (domain_id) REFERENCES virtual_domains(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+CREATE TABLE `virtual_aliases` (
+  `id` int(11) NOT NULL auto_increment,
+  `domain_id` int(11) NOT NULL,
+  `source` varchar(100) NOT NULL,
+  `destination` varchar(100) NOT NULL,
+  PRIMARY KEY (`id`),
+  FOREIGN KEY (domain_id) REFERENCES virtual_domains(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+4. 테스트용 데이터를 삽입합니다.
+INSERT INTO `mailserver`.`virtual_domains` (`id` ,`name`) VALUES ('1', 'atreia.org'),
+
+INSERT INTO `mailserver`.`virtual_users` (`id`, `domain_id`, `password` , `email`) VALUES ('1', '1', ENCRYPT('skills2016##', CONCAT('$6$', SUBSTRING(SHA(RAND()), -16))), 'user01@atreia.org'), 
+('2', '1', ENCRYPT('skills2016##', CONCAT('$6$', SUBSTRING(SHA(RAND()), -16))), 'user02@atreia.org');
+
+INSERT INTO `mailserver`.`virtual_aliases` (`id`, `domain_id`, `source`, `destination`)
+VALUES ('1', '1', 'alias@atreia.org', 'user01@atreia.org');
+
+5. 테이블 내용을 확인합니다.
+mysql> SELECT * FROM mailserver.테이블이름;
+ 
+
+5. Postfix
+ 
+ 
+ 
+ 
+1. /etc/postfix/main.cf
+### private/dovecot-lmtp 파일은 dovecot 설정 후 생성됩니다 ###
+# Debian specific:  Specifying a file name will cause the first
+# line of that file to be used as the name.  The Debian default
+# is /etc/mailname.
+smtpd_banner = $myhostname ESMTP $mail_name (Ubuntu)
+biff = no
+ 
+# appending .domain is the MUA's job.
+append_dot_mydomain = no
+ 
+# Uncomment the next line to generate "delayed mail" warnings
+#delay_warning_time = 4h
+readme_directory = no
+
+# TLS parameters
+#smtpd_tls_cert_file=/etc/ssl/certs/ssl-cert-snakeoil.pem
+#smtpd_tls_key_file=/etc/ssl/private/ssl-cert-snakeoil.key
+#smtpd_use_tls=yes
+#smtpd_tls_session_cache_database = btree:${data_directory}/smtpd_scache
+#smtp_tls_session_cache_database = btree:${data_directory}/smtp_scache
+ 
+smtpd_tls_cert_file=/var/mail/certs/mail.atreia.org.crt
+smtpd_tls_key_file=/var/mail/certs/mail.atreia.org.key
+smtpd_tls_CAfile=/etc/ssl/certs/ATREIA-CA.crt
+smtpd_use_tls=yes
+smtpd_tls_auth_only=yes
+
+#Enabling SMTP for authenticated users, and handing off authentication to Dovecot
+smtpd_sasl_type = dovecot
+smtpd_sasl_path = private/auth
+smtpd_sasl_auth_enable = yes
+smtpd_recipient_restrictions = permit_sasl_authenticated, permit_mynetworks, reject_unauth_destination
+
+# See /usr/share/doc/postfix/TLS_README.gz in the postfix-doc package for
+# information on enabling SSL in the smtp client
+myhostname = mail.atreia.org
+alias_maps = hash:/etc/aliases
+alias_database = hash:/etc/aliases
+myorigin = /etc/mailname
+#mydestination = example.com, hostname.example.com, localhost.example.com, localhost
+mydestination = localhost, localhost.localdomain
+relayhost =
+mynetworks =
+mailbox_size_limit = 0
+recipient_delimiter = +
+inet_interfaces = all
+
+#Handing off local delivery to Dovecot's LMTP, and telling it where to store mail
+virtual_transport = lmtp:unix:private/dovecot-lmtp
+
+#Virtual domains, users, and aliases
+virtual_mailbox_domains = mysql:/etc/postfix/mysql-virtual-mailbox-domains.cf
+virtual_mailbox_maps = mysql:/etc/postfix/mysql-virtual-mailbox-maps.cf
+virtual_alias_maps = mysql:/etc/postfix/mysql-virtual-alias-maps.cf, mysql:/etc/postfix/mysql-virtual-email2email.cf
+
+2. /etc/postfix/mysql-virtual-mailbox-domains.cf (생성)
+user = mailuser
+password = mailuserpass
+hosts = 127.0.0.1
+dbname = mailserver
+query = SELECT 1 FROM virtual_domains WHERE name='%s'
+
+3. /etc/postfix/mysql-virtual-mailbox-maps.cf (생성)
+user = mailuser
+password = mailuserpass
+hosts = 127.0.0.1
+dbname = mailserver
+query = SELECT 1 FROM virtual_users WHERE email='%s'
+
+4. /etc/postfix/mysql-virtual-alias-maps.cf (생성)
+user = mailuser
+password = mailuserpass
+hosts = 127.0.0.1
+dbname = mailserver
+query = SELECT destination FROM virtual_aliases WHERE source='%s'
+
+5. /etc/postfix/mysql-virtual-email2email.cf (생성)
+user = mailuser
+password = mailuserpass
+hosts = 127.0.0.1
+dbname = mailserver
+query = SELECT email FROM virtual_users WHERE email='%s'
+
+6. 설정 테스트
+# systemctl restart postfix.service
+# postmap -q atreia.org mysql:/etc/postfix/mysql-virtual-mailbox-domains.cf
+1
+# postmap -q user01@atreia.org mysql:/etc/postfix/mysql-virtual-mailbox-maps.cf
+1
+# postmap -q alias@atreia.org mysql:/etc/postfix/mysql-virtual-mailbox-domains.cf
+user01@atreia.org
+
+### master.cf 파일은 변경하지 않고 일반, TLS 포트를 모두 25번포트로 사용합니다 ###
+
+6. Dovecot
+1. /etc/dovecot/dovecot.conf (pop3 사용시 protocols = imap pop3 lmtp)
+ 
+2. /etc/dovecot/conf.d/10-mail.conf
+### 메일이 저장되는 디렉터리는 “/var/mail/vhosts/atreia.org/유저이름” 입니다 ###
+ 
+ 
+# mkdir -p /var/mail/vhosts/atreia.org
+# groupadd -g 5000 vmail
+# useradd -g vmail -u 5000 vmail -d /var/mail
+# chown -R vmail:vmail /var/mail && chown -R vmail:dovecot /etc/dovecot
+
+3. /etc/dovecot/conf.d/10-auth.conf
+ 
+ 
+ 
+
+4. /etc/dovecot/conf.d/auth-sql.conf.ext
+ 
+5. /etc/dovecot/dovecot-sql.conf.ext
+ 
+ 
+ 
+
+6. /etc/dovecot/conf.d/10-master.conf (lmtp, SASL 설정)
+ 
+ 
+
+7. /etc/dovecot/conf.d/10-ssl.conf	
+ 
+
+
+
+
+8. /etc/dovecot/conf.d/10-master.conf (일반 포트를 사용하지 않을 때)
+service imap-login {
+	inet_listener imap {
+		port = 0
+	}
+	inet_listener imaps {
+		port = 993
+		ssl = yes
+	}
+
+service pop3-login {
+	inet_listener pop3 {
+		port = 0
+	}
+	inet_listener pop3s {
+		port = 995
+		ssl = yes
+}
+ 
+
+7. 테스트
+아래와 같이 메일 클라이언트에서 설정하고 테스트 합니다.
+서버 : mail.atreia.org
+받는 메일 : imap / SSL / 993
+보내는 메일 : TLS / 25
+
