@@ -1,0 +1,140 @@
+Active Directory + Kerberos + Apache2 SSO
+
+root@mail:~# apt-get install krb5-clients krb5-user krb5-config apache2-mpm-prefork libapache2-mod-auth-kerb smbclient
+Reading package lists... Done
+Building dependency tree
+Reading state information... Done
+The following extra packages will be installed:
+  libtalloc2 libwbclient0 samba-common samba-common-bin
+Suggested packages:
+  cifs-utils
+The following packages will be REMOVED:
+  apache2-mpm-worker
+The following NEW packages will be installed:
+  apache2-mpm-prefork krb5-clients krb5-config krb5-user
+  libapache2-mod-auth-kerb libtalloc2 libwbclient0 samba-common
+  samba-common-bin smbclient
+0 upgraded, 10 newly installed, 1 to remove and 0 not upgraded.
+Need to get 0 B/20.4 MB of archives.
+After this operation, 61.9 MB of additional disk space will be used.
+Do you want to continue [Y/n]? Y
+
+root@mail:~# vim /etc/krb5.conf
+:set nu
+  1 [libdefaults]
+  2         default_realm = KOREA.COM
+  3
+.
+.
+ 39 [realms]
+ 40         KOREA.COM = {
+ 41                 kdc = ads.korea.com
+ 42                 admin_server = ads.korea.com
+ 43                 default_domain = korea.com
+ 44         }
+ 45
+ 46 [domain_realm]
+ 47         .korea.com = KOREA.COM
+ 48         korea.com = KOREA.COM
+:x
+root@mail:~# net time set -S ads.korea.com
+Wed Aug  7 14:50:13 KST 2013
+
+root@mail:~# kinit administrator
+Password for administrator@KOREA.COM:**********   ; 도메인 Administrator 암호
+root@mail:~# klist
+Ticket cache: FILE:/tmp/krb5cc_0
+Default principal: administrator@KOREA.COM
+
+Valid starting     Expires            Service principal
+08/07/13 14:50:32  08/08/13 00:50:34  krbtgt/KOREA.COM@KOREA.COM
+        renew until 08/08/13 14:50:32
+
+root@mail:~# vim /etc/samba/smb.conf
+:set nu
+ 33 [global]
+ 34
+ 35 ## Browsing/Identification ###
+ 36
+ 37 # Change this to the workgroup/NT-domain name your Samba server will part of
+ 38    workgroup = KOREA
+ 39    realm = KOREA.COM
+.
+.
+ 97 ####### Authentication #######
+ 98
+ 99 # "security = user" is always a good idea. This will require a Unix account
+100 # in this server for every user accessing the server. See
+101 # /usr/share/doc/samba-doc/htmldocs/Samba3-HOWTO/ServerType.html
+102 # in the samba-doc package for details.
+103    security = ads
+:x
+
+root@mail:~# net ads join -U administrator
+Enter administrator's password:**********   ; 도메인 Administrator 암호
+Using short domain name -- KOREA
+Joined 'MAIL' to realm 'korea.com’
+
+
+
+
+root@mail:~# net ads keytab add HTTP -U administrator
+
+Warning: "kerberos method" must be set to a keytab method to use keytab functions.
+Processing principals to add...
+Enter administrator's password:**********   ; 도메인 Administrator 암호
+
+root@mail:~# ktutil
+ktutil:  rkt /etc/krb5.keytab
+ktutil:  l
+slot KVNO Principal
+---- ---- ---------------------------------------------------------------------
+   1    2            HTTP/mail.korea.com@KOREA.COM
+   2    2            HTTP/mail.korea.com@KOREA.COM
+   3    2            HTTP/mail.korea.com@KOREA.COM
+   4    2                      HTTP/mail@KOREA.COM
+   5    2                      HTTP/mail@KOREA.COM
+   6    2                      HTTP/mail@KOREA.COM
+ktutil:  quit
+
+root@mail:~# chgrp www-data /etc/krb5.keytab
+root@mail:~# chmod 740 /etc/krb5.keytab
+
+  Windows Server 2008 R2에서 웹서비스에 대한 keytab를 생성하려면 명령프롬프트에서 아래 명령을 실행한 후 해당 파일을 리눅스 서버의 “/etc/krb5.ketab”을 저장하면 된다.
+
+ktpass –princ HTTP/mail.korea.com@KOREA.COM –mapuser {http-linux-server} -crypto DES-CBC-MD5 -ptype KRB5_NT_PRINCIPAL -mapop set +desonly –pass {password} -out c:\server.keytab 
+
+
+Apache 인증페이지 설정
+
+root@mail:~# vim /var/www/.htaccess
+AuthType Kerberos
+AuthName "Kerberos Login"
+KrbAuthRealms KOREA.COM
+KrbMethodNegotiate On
+KrbMethodK5Passwd On
+Krb5KeyTab /etc/krb5.keytab
+require valid-user
+:x
+
+root@mail:~# service apache2 restart
+Restarting web server: apache2 ... waiting .
+
+
+
+클라이언트 설정
+
+
+
+
+
+
+
+  SSO를 지원하기 위해서는 해당사이트가 인트라넷 영역에 포함되어야 한다.
+따라서 아래와 같이 http://mail.korea.com 사이트를 인트라넷 네트워크로 등록하도록 한다.
+
+
+
+
+
+
