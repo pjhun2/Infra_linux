@@ -1,0 +1,52 @@
+Linux:~# apt-get install bind9
+ 
+< 설정 과정 >
+Linux:~# cd /etc/bind/
+Linux:/etc/bind# dnssec-keygen –a HMAC-MD5 –b 128 –r /dev/urandom –n USER DDNS_UPDATE
+ 
+Linux:/etc/bind# cat Kddns_update*.private | grep Key >ddns.key
+Linux:/etc/bind# vim ddns.key
+             Key: /KnUZzSPn8vUyEQysp31Ug==
+             // 위 내용을 아래와 같이 변경
+ 
+             key DDNS_UPDATE {
+                           algorithm HMAC-MD5;
+                           secret "/KnUZzSPn8vUyEQysp31Ug==";
+             };
+ 
+Linux:/etc/bind# chown bind.bind /etc/bind/
+Linux:/etc/bind# chown bind.bind /etc/bind/*
+
+ 
+Linux:/etc/bind# vim named.conf.default-zones
+             아래 내용을 포함하도록 구성합니다.
+           key DDNS_UPDATE {
+                           algorithm HMAC-MD5;
+                           secret "/KnUZzSPn8vUyEQysp31Ug==";
+             };
+            
+             zone "korea.com" {
+                           type master;
+                           file "/etc/bind/korea.com";
+                           allow-update { key DDNS_UPDATE; };
+                           notify no;
+             };
+ 
+Linux:~# vim /etc/dhcp/dhcpd.conf
+             ddns-updates on;
+             ddns-update-style interim;
+             allow booting;               
+             allow bootp;                
+ 
+             key DDNS_UPDATE {
+                           algorithm HMAC-MD5;
+                           secret "/KnUZzSPn8vUyEQysp31Ug==";
+             };
+ 
+// 아래 부분 내용은 Subnet 문구에 포함되도록 설정합니다.
+zone korea.com. {
+                           primary 127.0.0.1;
+                           key DDNS_UPDATE;
+             }
+ 
+위와 같이 구성한 후 Client에서 DHCP를 통해 IP를 할당받은 후 정상적으로 BIND9에 동적으로 레코드가 추가되는지 확인합니다.
