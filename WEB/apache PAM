@@ -1,0 +1,54 @@
+Apache AuthConfig + Linux PAM
+
+root@mail:~# apt-get install libapache2-mod-auth-pam
+Reading package lists... Done
+Building dependency tree
+Reading state information... Done
+The following NEW packages will be installed:
+  libapache2-mod-auth-pam
+0 upgraded, 1 newly installed, 0 to remove and 0 not upgraded.
+Need to get 0 B/9,072 B of archives.
+After this operation, 106 kB of additional disk space will be used.
+Selecting previously deselected package libapache2-mod-auth-pam.
+(Reading database ... 25485 files and directories currently installed.)
+Unpacking libapache2-mod-auth-pam (from .../libapache2-mod-auth-pam_1.1.1-8_i386.deb) ...
+Setting up libapache2-mod-auth-pam (1.1.1-8) ...
+
+root@mail:~# a2enmod auth_pam
+Enabling module auth_pam.
+Run '/etc/init.d/apache2 restart' to activate new configuration!
+
+root@mail:~# vim /etc/apache2/sites-enabled/000-default
+:set nu
+  1 <VirtualHost *:80>
+  2         ServerAdmin webmaster@localhost
+  3
+  4         DocumentRoot /var/www
+  5         <Directory />
+  6                 Options FollowSymLinks
+  7                 AllowOverride None
+  8         </Directory>
+  9         <Directory /var/www/>
+ 10                 Options Indexes FollowSymLinks MultiViews
+ 11                 AllowOverride Authconfig
+ 12                 Order allow,deny
+ 13                 allow from all
+ 14                 AuthType Basic
+ 15                 AuthName "Restricted area for My Server"
+ 16                 AuthPAM_Enabled On
+ 17                 AuthBasicAuthoritative Off
+ 18                 AuthUserFile /dev/null
+ 19                 Require valid-user     ; 그룹 제한 “Required group 그룹이름”
+ 20         </Directory>
+:x
+
+root@mail:~# vim /etc/group
+src:x:40:
+gnats:x:41:
+shadow:x:42:www-data
+utmp:x:43:
+video:x:44:manager
+:x
+
+root@mail:~# service apache2 restart
+Restarting web server: apache2 ... waiting .
