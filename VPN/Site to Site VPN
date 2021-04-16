@@ -1,0 +1,886 @@
+시나리오) 
+1. fw.korea.com 서버에 내부/외부 네트워크를 위한 DNS서비스 및 DHCP 서비스를 설치
+2. ca.korea.com 서버에 Self-Sign Certificate Authority를 설치
+3. fw.korea.com <-> remote.korea.com 서버 사이에 IPsec VPN을 구성하여 192.168.0.0/24 네트워크와 172.16.0.0/24 네트워크 통신에 문제가 없도록 구성
+(단, ca.korea.com 서버로부터 서명 받은 인증서를 통하여 Peer 인증하도록 한다.)
+4. www.korea.com 서버에 ca.korea.com 서버로부터 서명 받은 인증서를 통하여 보안 웹사이트를 설치.
+1. 라우터 설정
+
+
+r1.korea.com 라우터 설정
+
+hostname r1
+!
+ip domain name korea.com
+ip name-server 210.104.1.1
+!
+interface FastEthernet0/0
+ ip address 210.104.1.254 255.255.255.0
+!
+interface Serial0/0
+ ip address 211.34.67.254 255.255.255.192
+!
+ip route 0.0.0.0 0.0.0.0 Serial0/0
+
+
+r2.korea.com 라우터 설정
+
+hostname r2
+!
+ip domain name korea.com
+ip name-server 210.104.1.1
+
+interface FastEthernet0/0
+ ip address 211.34.67.190 255.255.255.192
+!
+interface Serial0/0
+ ip address 211.34.67.193 255.255.255.192
+!
+interface FastEthernet0/1
+ ip address 211.34.67.126 255.255.255.128
+!
+ip route 0.0.0.0 0.0.0.0 Serial0/0
+2. DNS 서비스 구성 (fw.korea.com)
+
+root@fw:~# apt-get install bind9 isc-dhcp-server   ; 패키지 설치
+root@fw:~# vim /etc/bind/named.conf
+:set nu
+  9 include "/etc/bind/named.conf.options";
+ 10 include "/etc/bind/named.conf.local";
+ 11 #include "/etc/bind/named.conf.default-zones";
+ 12 include "/etc/bind/named.conf.korea-zones";
+:x
+
+root@fw:~# vim /etc/bind/named.conf.korea-zones
+:set nu
+  1 view internal {             ; 내부 네트워크를 위한 view 선언
+  2         match-clients { 192.168.0.0/24; 172.16.0.0/24; };
+  3         include "/etc/bind/named.conf.default-zones";
+  4         zone "korea.com" {
+  5                 type master;
+  6                 file "/etc/bind/korea.com.int";
+  7         };
+  8 };
+  9
+ 10 view external {             ; 외부 네트워크를 위한 view 선언
+ 11         match-clients { any; };
+ 12         include "/etc/bind/named.conf.default-zones";
+ 13         zone "korea.com" {
+ 14                 type master;
+ 15                 file "/etc/bind/korea.com.ext";
+ 16         };
+ 17 };
+:x
+
+root@fw:~# vim /etc/bind/korea.com.int  ;  internal view zone file
+:set nu
+  1 ;
+  2 ; BIND data file for local loopback interface
+  3 ;
+  4 $TTL    300
+  5 @       IN      SOA     fw.korea.com. root.fw.korea.com. (
+  6                               2         ; Serial
+  7                          604800         ; Refresh
+  8                           86400         ; Retry
+  9                         2419200         ; Expire
+ 10                          604800 )       ; Negative Cache TTL
+ 11 ;
+ 12 @       IN      NS      fw.korea.com.
+ 13 @       IN      A       192.168.0.254
+ 14 fw      IN      A       192.168.0.254
+ 15 www     IN      A       192.168.0.1
+ 16 remote  IN      A       172.16.0.254
+ 17 r1      IN      A       210.104.1.254
+ 18 r2      IN      A       211.34.67.193
+ 19 ca      IN      A       211.34.67.1
+:x
+
+root@fw:~# vim /etc/bind/korea.com.ext    ;  external view zone file
+:set nu
+  1 ;
+  2 ; BIND data file for local loopback interface
+  3 ;
+  4 $TTL    300
+  5 @       IN      SOA     fw.korea.com. root.fw.korea.com. (
+  6                               2         ; Serial
+  7                          604800         ; Refresh
+  8                           86400         ; Retry
+  9                         2419200         ; Expire
+ 10                          604800 )       ; Negative Cache TTL
+ 11 ;
+ 12 @       IN      NS      fw.korea.com.
+ 13 @       IN      A       210.104.1.1
+ 14 fw      IN      A       210.104.1.1
+ 15 www     IN      A       210.104.1.1
+ 16 remote  IN      A       211.34.67.129
+ 17 ca      IN      A       211.34.67.1
+ 18 r1      IN      A       210.104.1.254
+ 19 r2      IN      A       211.34.67.193
+:x
+
+3. DHCP 서비스 구성 (fw.korea.com)
+
+root@fw:~# vim /etc/dhcp/dhcpd.conf
+:set nu
+ 12 # option definitions common to all supported networks...
+ 13 option domain-name "korea.com";
+ 14 option domain-name-servers 210.104.1.1;
+ 15
+ 16 default-lease-time 600;
+ 17 max-lease-time 7200;
+.
+.
+{ 중략 }
+.
+.
+ 30 subnet 210.104.1.0 netmask 255.255.255.0 {
+ 31 }
+ 32
+ 33 # This is a very basic subnet declaration.
+ 34
+ 35 subnet 192.168.0.0 netmask 255.255.255.0 {
+ 36   range 192.168.0.100 192.168.0.199;
+ 37   option routers 192.168.0.254;
+ 38 }
+ 39
+ 40 subnet 172.16.0.0 netmask 255.255.255.0 {
+ 41   range 172.16.0.100 172.16.0.199;
+ 42   option routers 172.16.0.254;
+ 43 }
+:x
+
+4. Root 인증기관 설치
+
+root@ca:~# mkdir /etc/ssl/korea-CA   ; 인증기관이 설치될 디렉터리 생성
+root@ca:~# vim /etc/ssl/openssl.cnf
+:set nu
+ 35 ####################################################################
+ 36 [ ca ]
+ 37 default_ca      = CA_default            # The default ca section
+ 38
+ 39 ####################################################################
+ 40 [ CA_default ]
+ 41
+ 42 dir             = /etc/ssl/korea-CA     ; 인증기관이 설치될 디렉터리 선언
+ 43 certs           = $dir/certs            # Where the issued certs are kept
+ 44 crl_dir         = $dir/crl              # Where the issued crl are kept
+ 45 database        = $dir/index.txt        # database index file.
+ 46 #unique_subject = no                    # Set to 'no' to allow creation of
+ 47                                         # several ctificates with same subject.
+ 48 new_certs_dir   = $dir/newcerts         # default place for new certs.
+.
+.
+{ 중략 }
+.
+.
+163 [ usr_cert ]
+164 crlDistributionPoints=URI:http://ca.korea.com/crl/korea-CA.crl   ; CDP 게시
+165 # These extensions are added when 'ca' signs a request.
+166
+.
+.
+{ 중략 }
+.
+.
+217 [ v3_req ]
+218 crlDistributionPoints=URI:http://ca.korea.com/crl/korea-CA.crl
+219 # Extensions to add to a certificate request
+220
+221 basicConstraints = CA:FALSE
+222 keyUsage = nonRepudiation, digitalSignature, keyEncipherment
+223
+224 [ v3_vpn ]     ; IPsec Peer 인증을 위한 인증서 extensions 추가
+225 crlDistributionPoints=URI:http://ca.korea.com/crl/korea-CA.crl
+226 # Extensions to add to a certificate request
+227
+228 basicConstraints = CA:FALSE
+229 keyUsage = nonRepudiation, digitalSignature, keyEncipherment
+230 subjectAltName = DNS:fw.korea.com,DNS:remote.kore.com,IP:210.104.1.1,IP:211,34,
+    67,129
+231
+232 [ v3_ca ]
+233 crlDistributionPoints=URI:http://ca.korea.com/crl/korea-CA.crl
+234
+235 # Extensions for a typical CA
+:x
+
+subjectAltName은 아래와 같이 extensions 타입으로도 등록이 가능합니다.
+(본인이 편한 타입 1개만 선정하면 되겠네요)
+
+224 [ v3_vpn ]
+225 crlDistributionPoints=URI:http://ca.korea.com/crl/korea-CA.crl
+226 # Extensions to add to a certificate request
+227
+228 basicConstraints = CA:FALSE
+229 keyUsage = nonRepudiation, digitalSignature, keyEncipherment
+230 subjectAltName = @vpn_altnames
+231
+232 [vpn_altnames]
+233 DNS.1=fw.korea.com
+234 DNS.2=remote.kore.com
+235 IP.1=210.104.1.1
+236 IP.2=211.34.67.129
+
+
+root@ca:~# vim /usr/lib/ssl/misc/CA.pl
+:set nu
+ 56 $CATOP="/etc/ssl/korea-CA";    ; 인증서가 설치될 디렉터리 선언
+ 57 $CAKEY="cakey.pem";
+ 58 $CAREQ="careq.pem";
+ 59 $CACERT="cacert.pem";
+:x
+
+root@ca:~# /usr/lib/ssl/misc/CA.pl –newca     ; Self-sign 인증기관 설치
+CA certificate filename (or enter to create)
+
+Making CA certificate ...
+Generating a 2048 bit RSA private key
+...........+++
+..........................................................................................................................................+++
+writing new private key to '/etc/ssl/korea-CA/private/cakey.pem'
+Enter PEM pass phrase:*********             ; 개인키 암호 등록
+Verifying - Enter PEM pass phrase:*********  ; 개인키 암호 확인
+-----
+You are about to be asked to enter information that will be incorporated
+into your certificate request.
+What you are about to enter is what is called a Distinguished Name or a DN.
+There are quite a few fields but you can leave some blank
+For some fields there will be a default value,
+If you enter '.', the field will be left blank.
+-----
+Country Name (2 letter code) [AU]:KR
+State or Province Name (full name) [Some-State]:
+Locality Name (eg, city) []:
+Organization Name (eg, company) [Internet Widgits Pty Ltd]:
+Organizational Unit Name (eg, section) []:
+Common Name (e.g. server FQDN or YOUR name) []:korea-CA
+Email Address []:
+
+Please enter the following 'extra' attributes
+to be sent with your certificate request
+A challenge password []:
+An optional company name []:
+Using configuration from /usr/lib/ssl/openssl.cnf
+Enter pass phrase for /etc/ssl/korea-CA/private/cakey.pem:********
+Check that the request matches the signature
+Signature ok
+Certificate Details:
+        Serial Number: 13896244829359423041 (0xc0d9610bfdd3be41)
+        Validity
+            Not Before: Feb  8 13:24:39 2015 GMT
+            Not After : Feb  7 13:24:39 2018 GMT
+        Subject:
+            countryName               = KR
+            stateOrProvinceName       = Some-State
+            organizationName          = Internet Widgits Pty Ltd
+            commonName                = korea-CA
+        X509v3 extensions:
+            X509v3 CRL Distribution Points:
+
+                Full Name:
+                  URI:http://ca.korea.com/crl/korea-CA.crl
+
+            X509v3 Subject Key Identifier:
+                95:0B:74:5E:2F:C6:8E:5E:07:FB:3F:D9:5E:02:D1:7C:19:3A:3E:C6
+            X509v3 Authority Key Identifier:
+                keyid:95:0B:74:5E:2F:C6:8E:5E:07:FB:3F:D9:5E:02:D1:7C:19:3A:3E:C6
+
+            X509v3 Basic Constraints:
+                CA:TRUE
+Certificate is to be certified until Feb  7 13:24:39 2018 GMT (1095 days)
+
+Write out database with 1 new entries
+Data Base Updated
+
+root@ca:~# openssl ca -gencrl –out /etc/ssl/korea-CA/crl/korea-CA.crl   ; crl 생성
+Using configuration from /usr/lib/ssl/openssl.cnf
+Enter pass phrase for /etc/ssl/korea-CA/private/cakey.pem:********
+
+root@ca:~# ln -s /etc/ssl/korea-CA/cacert.pem /etc/ssl/certs/korea-CA.crt  ; 신뢰된 루트인증기관 목록에 추가
+
+root@ca:~# apt-get install apache2 lynx  ; crl 게시를 위한 웹서버 설치
+root@ca:~# vim /etc/apache2/sites-enabled/000-default
+:set-nu
+ 16         Alias /crl      /etc/ssl/korea-CA/crl/
+ 17         <Directory /etc/ssl/korea-CA/crl/>
+ 18                 Options Indexes FollowSymLinks MultiViews
+ 19                 AllowOverride None
+ 20                 Order allow,deny
+ 21                 allow from all
+ 22         </Directory>
+:x
+
+root@ca:~# service apache2 restart
+[ ok ] Restarting web server: apache2 ... waiting .
+
+root@ca:~# lynx http://ca.korea.com/crl   ; CDP 검증
+
+
+
+4. OpenSwan을 이용한 IPsec VPN 구성
+
+root@fw:~# apt-get install openswan     ; 패키지 설치
+
+
+root@fw:~# cp /etc/sysctl.conf /etc/sysctl.conf.old  ; 커널파라메터 수정을 위하여 원본 백업
+root@fw:~# cp /etc/ipsec.d/examples/sysctl.conf /etc  
+root@fw:~# sysctl –p    ; 커널파라메터 적용
+net.ipv4.ip_forward = 1
+net.ipv4.conf.default.rp_filter = 0
+net.ipv4.conf.all.rp_filter = 0
+net.ipv4.conf.all.send_redirects = 0
+net.ipv4.conf.default.send_redirects = 0
+net.ipv4.icmp_ignore_bogus_error_responses = 1
+net.ipv4.conf.default.log_martians = 0
+net.ipv4.conf.all.log_martians = 0
+net.ipv4.conf.default.accept_source_route = 0
+net.ipv4.conf.all.accept_redirects = 0
+net.ipv4.conf.default.accept_redirects = 0
+net.ipv4.neigh.default.gc_thresh1 = 1024
+net.ipv4.neigh.default.gc_thresh2 = 2048
+net.ipv4.neigh.default.gc_thresh3 = 4096
+
+root@fw:~# vim /etc/ipsec.conf   ; IPsec VPN 설정파일 편집
+:set nu
+ 34         # OE is now off by default. Uncomment and change to on, to enable.
+ 35         oe=off
+ 36         # which IPsec stack to use. auto will try netkey, then klips then mast
+ 37         protostack=netkey
+.
+.
+{ 중략 }
+.
+.
+ 57 conn    ipsec-vpn
+ 58         left=210.104.1.1
+ 59         leftsubnet=192.168.0.0/24
+ 60         leftnexthop=210.104.1.254
+ 61         right=211.34.67.129
+ 62         rightsubnet=172.16.0.0/24
+ 63         rightnexthop=211.34.67.190
+ 66         authby=secret
+ 67         type=tunnel
+ 68         auto=start
+:x
+
+root@fw:~# vim /var/lib/openswan/ipsec.secrets.inc
+: PSK "password"     ; PreShared Key를 통한 Peer 인증
+
+root@fw:~# service ipsec restart   ; openswan 재시작
+ipsec_setup: Stopping Openswan IPsec...
+ipsec_setup: Starting Openswan IPsec U2.6.37-g955aaafb-dirty/K3.2.0-4-amd64...
+
+※  remote.korea.com 서버도 동일한 방법으로 설정을 하도록 합니다.
+
+
+root@fw:~# apt-get install tshark    ; 패킷 모니터링을 위해 설치
+
+
+C:\Users\user>ping 172.16.0.254 –t    ; client1.korea.com 클라이언트에서 ICMP 테스트
+
+Ping 172.16.0.254 32바이트 데이터 사용:
+172.16.0.254의 응답: 바이트=32 시간=11ms TTL=63
+172.16.0.254의 응답: 바이트=32 시간=20ms TTL=63
+172.16.0.254의 응답: 바이트=32 시간=13ms TTL=63
+172.16.0.254의 응답: 바이트=32 시간=16ms TTL=63
+
+root@fw:~# tshark -i eth0 host 211.34.67.129    ; 패킷 캡춰
+tshark: Lua: Error during loading:
+ [string "/usr/share/wireshark/init.lua"]:45: dofile has been disabled
+Running as user "root" and group "root". This could be dangerous.
+Capturing on eth0
+  0.000000  210.104.1.1 -> 211.34.67.129 ESP 134 ESP (SPI=0xe58a2dca)
+  0.010595 211.34.67.129 -> 210.104.1.1  ESP 134 ESP (SPI=0x77e32b76)
+  1.006279  210.104.1.1 -> 211.34.67.129 ESP 134 ESP (SPI=0xe58a2dca)
+  1.026075 211.34.67.129 -> 210.104.1.1  ESP 134 ESP (SPI=0x77e32b76)
+  2.021767  210.104.1.1 -> 211.34.67.129 ESP 134 ESP (SPI=0xe58a2dca)
+  2.034075 211.34.67.129 -> 210.104.1.1  ESP 134 ESP (SPI=0x77e32b76)
+  3.037922  210.104.1.1 -> 211.34.67.129 ESP 134 ESP (SPI=0xe58a2dca)
+  3.053672 211.34.67.129 -> 210.104.1.1  ESP 134 ESP (SPI=0x77e32b76)
+
+아래 명령으로 ipsec tunnel을 상태를 모니터 할 수 있다.
+root@fw:~# ipsec auto --status | grep ipsec-vpn
+root@fw:~# ipsec look
+
+
+
+
+
+
+5. 인증서 기반의 IPsec VPN 구성
+
+root@fw:~# openssl req -out /etc/ipsec.d/certs/fw.korea.com.csr -newkey rsa:1024 –keyout /etc/ipsec.d/private/fw.korea.com.key  ; 개인키 및 CSR키 생성
+Generating a 1024 bit RSA private key
+....++++++
+......................++++++
+writing new private key to '/etc/ipsec.d/private/fw.korea.com.key'
+Enter PEM pass phrase:********
+Verifying - Enter PEM pass phrase:********
+-----
+You are about to be asked to enter information that will be incorporated
+into your certificate request.
+What you are about to enter is what is called a Distinguished Name or a DN.
+There are quite a few fields but you can leave some blank
+For some fields there will be a default value,
+If you enter '.', the field will be left blank.
+-----
+Country Name (2 letter code) [AU]:KR
+State or Province Name (full name) [Some-State]:
+Locality Name (eg, city) []:
+Organization Name (eg, company) [Internet Widgits Pty Ltd]:
+Organizational Unit Name (eg, section) []:
+Common Name (e.g. server FQDN or YOUR name) []:fw.korea.com
+Email Address []:
+
+Please enter the following 'extra' attributes
+to be sent with your certificate request
+A challenge password []:
+An optional company name []:
+
+root@fw:~# openssl rsa -in /etc/ipsec.d/private/fw.korea.com.key -outform der –out /etc/ipsec.d/private/fw.korea.com.key  ; 개인키 포맷을 바이너리 타입으로 변경
+Enter pass phrase for /etc/ipsec.d/private/fw.korea.com.key:********
+writing RSA key
+
+root@fw:~# scp /etc/ipsec.d/certs/fw.korea.com.csr root@ca.korea.com:/root  ; CSR키를 인증기관으로 복사
+The authenticity of host 'ca.korea.com (211.34.67.1)' can't be established.
+ECDSA key fingerprint is e5:39:0d:91:a2:08:08:39:a3:f8:71:b6:c1:42:18:ea.
+Are you sure you want to continue connecting (yes/no)? yes
+Warning: Permanently added 'ca.korea.com' (ECDSA) to the list of known hosts.
+root@ca.korea.com's password:********
+fw.korea.com.csr                                     100%  635     0.6KB/s   00:00
+
+
+root@ca:~# openssl ca -days 365 -extensions v3_vpn -policy policy_anything -in fw.korea.com.csr –out fw.korea.com.crt    ; 인증서 서명 (extensions는 새로 추가한 v3_vpn 사용)
+Using configuration from /usr/lib/ssl/openssl.cnf
+Enter pass phrase for /etc/ssl/korea-CA/private/cakey.pem:********
+Check that the request matches the signature
+Signature ok
+Certificate Details:
+        Serial Number: 13896244829359423042 (0xc0d9610bfdd3be42)
+        Validity
+            Not Before: Feb  8 14:26:48 2015 GMT
+            Not After : Feb  8 14:26:48 2016 GMT
+        Subject:
+            countryName               = KR
+            stateOrProvinceName       = Some-State
+            organizationName          = Internet Widgits Pty Ltd
+            commonName                = fw.korea.com
+        X509v3 extensions:
+            X509v3 CRL Distribution Points:
+
+                Full Name:
+                  URI:http://ca.korea.com/crl/korea-CA.crl
+
+            X509v3 Basic Constraints:
+                CA:FALSE
+            X509v3 Key Usage:
+                Digital Signature, Non Repudiation, Key Encipherment
+            X509v3 Subject Alternative Name:
+                DNS:fw.korea.com, DNS:remote.kore.com, IP Address:210.104.1.1, IP Address:211.34.67.129
+Certificate is to be certified until Feb  8 14:26:48 2016 GMT (365 days)
+Sign the certificate? [y/n]:y
+
+1 out of 1 certificate requests certified, commit? [y/n]y
+Write out database with 1 new entries
+Data Base Updated
+
+root@ca:~# scp fw.korea.com.crt root@fw.korea.com:/etc/ipsec.d/certs  ; 서명한 인증서 복사
+The authenticity of host 'fw.korea.com (210.104.1.1)' can't be established.
+ECDSA key fingerprint is e5:39:0d:91:a2:08:08:39:a3:f8:71:b6:c1:42:18:ea.
+Are you sure you want to continue connecting (yes/no)? yes
+Warning: Permanently added 'fw.korea.com,210.104.1.1' (ECDSA) to the list of known hosts.
+root@fw.korea.com's password:********
+fw.korea.com.crt                                     100% 3818     3.7KB/s   00:00
+
+root@ca:~# scp /etc/ssl/korea-CA/cacert.pem root@fw.korea.com:/etc/ipsec.d/cacerts /korea-CA.crt    ; root 인증기관의 인증서 복사
+root@fw.korea.com's password:********
+cacert.pem                                           100% 4555     4.5KB/s   00:00
+
+root@fw:~# vim /var/lib/openswan/ipsec.secrets.inc
+: RSA fw.korea.com.key "password"    ; Peer 인증을 rsa-sig 방식으로 변경
+
+root@fw:~# vim /etc/ipsec.conf   ; ipsec 설정파일 편집
+:set nu
+앞부분은 Preshared Key 방식과 동일하게 설정
+ 57 conn    ipsec-vpn
+ 58         left=210.104.1.1
+ 59         leftsubnet=192.168.0.0/24
+ 60         leftnexthop=210.104.1.254
+ 61         right=211.34.67.129
+ 62         rightsubnet=172.16.0.0/24
+ 63         rightnexthop=211.34.67.190
+ 64         authby=rsasig
+ 65         leftrsasigkey=%cert
+ 66         rightrsasigkey=%cert
+ 67         leftcert=fw.korea.com.crt
+ 68         type=tunnel
+ 69         auto=start
+:x
+
+root@fw:~# service ipsec restart   ; openswan 서비스 재시작
+ipsec_setup: Stopping Openswan IPsec...
+ipsec_setup: Starting Openswan IPsec U2.6.37-g955aaafb-dirty/K3.2.0-4-amd64...
+
+root@fw:~# ipsec auto —listcerts   ; 인증서 목록 확인
+000
+000 List of X.509 End Certificates:
+000
+000 Feb 08 23:33:29 2015, count: 1    ; 반드시 자신의 인증서만 출력되어야 함
+000        subject: 'C=KR, ST=Some-State, O=Internet Widgits Pty Ltd, CN=fw.korea.com'
+000        issuer:  'C=KR, ST=Some-State, O=Internet Widgits Pty Ltd, CN=korea-CA'
+000        serial:   00:c0:d9:61:0b:fd:d3:be:42
+000        pubkey:   1024 RSA Key AwEAAcHgo, has private key
+000        validity: not before Feb 08 23:26:48 2015 ok
+000                  not after  Feb 08 23:26:48 2016 ok
+
+
+※  remote.korea.com 서버도 동일한 방법으로 설정을 하도록 합니다.
+
+root@remote:~# ipsec showhostkey —left   ; 상호 데이터 암호를 위한 대칭키 확인
+        # rsakey AwEAAaqwy
+        leftrsasigkey=0sAwEAAaqwyw5CjhbnZX5KDrbCwIJgyajlrzOS6WdvdSI3eWYzWUv+Nzoe8vSHQpQH3TPzmWOMmyhZuSWuQHJjWmBsTKTs9+CHD/rb2VnOvo+3TiBVtqahmqvKeGd4y27Fj8c5+aJaUv2ldZ/snIuKtMtRsIantkGISs87o2fZ8ouoz+3N
+
+root@remote:~# ipsec showhostkey --right
+        # rsakey AwEAAaqwy
+        rightrsasigkey=0sAwEAAaqwyw5CjhbnZX5KDrbCwIJgyajlrzOS6WdvdSI3eWYzWUv+Nzoe8vSHQpQH3TPzmWOMmyhZuSWuQHJjWmBsTKTs9+CHD/rb2VnOvo+3TiBVtqahmqvKeGd4y27Fj8c5+aJaUv2ldZ/snIuKtMtRsIantkGISs87o2fZ8ouoz+3N
+6. 내부 보안 웹사이트 구축 (www.korea.com)
+
+※ 외부에서의 웹서버로의 접근을 위한 포트 포워딩 설정
+root@fw:~# iptables -t nat -A PREROUTING -d 210.104.1.1 -p tcp --dport 2022 -j DNAT —to 192.168.0.1:22   ; ssh 포트 포워딩
+root@fw:~# iptables -t nat -A PREROUTING -d 210.104.1.1 -p tcp --dport 443 -j DNAT —to 192.168.0.1:443  ; https 포트 포워딩
+root@fw:~# dpkg-reconfigure iptables-persistent   ; iptables 정책 저장
+
+
+
+
+root@www:~# apt-get install apache2  ; 웹서비스 패키지 설치
+root@www:~# a2enmod ssl    ; ssl 모듈 활성화
+Enabling module ssl.
+See /usr/share/doc/apache2.2-common/README.Debian.gz on how to configure SSL and create self-signed certificates.
+To activate the new configuration, you need to run:
+  service apache2 restart
+root@www:~# a2ensite default-ssl  ; ssl 사이트 활성화
+Enabling site default-ssl.
+To activate the new configuration, you need to run:
+  service apache2 reload
+
+root@www:~# mkdir –p /etc/apache2/ssl  ; 인증서 저장위치 생성
+root@www:~# openssl req -out /etc/apache2/ssl/www.korea.com.csr -newkey rsa:1024 -nodes –keyout /etc/apache2/ssl/www.korea.com.key  ; 개인키 및 CSR키 생성
+Generating a 1024 bit RSA private key
+.................++++++
+................................++++++
+writing new private key to '/etc/apache2/ssl/www.korea.com.key'
+-----
+You are about to be asked to enter information that will be incorporated
+into your certificate request.
+What you are about to enter is what is called a Distinguished Name or a DN.
+There are quite a few fields but you can leave some blank
+For some fields there will be a default value,
+If you enter '.', the field will be left blank.
+-----
+Country Name (2 letter code) [AU]:KR
+State or Province Name (full name) [Some-State]:
+Locality Name (eg, city) []:
+Organization Name (eg, company) [Internet Widgits Pty Ltd]:
+Organizational Unit Name (eg, section) []:
+Common Name (e.g. server FQDN or YOUR name) []:www.korea.com
+Email Address []:
+
+Please enter the following 'extra' attributes
+to be sent with your certificate request
+A challenge password []:
+An optional company name []:
+
+root@www:~# scp /etc/apache2/ssl/www.korea.com.csr root@ca.korea.com:/root  ; 인증서 서명을 위해 CSR키를 인증기관으로 복사
+The authenticity of host 'ca.korea.com (211.34.67.1)' can't be established.
+ECDSA key fingerprint is e5:39:0d:91:a2:08:08:39:a3:f8:71:b6:c1:42:18:ea.
+Are you sure you want to continue connecting (yes/no)? yes
+Warning: Permanently added 'ca.korea.com,211.34.67.1' (ECDSA) to the list of known hosts.
+root@ca.korea.com's password:********
+www.korea.com.csr                             100%  635     0.6KB/s   00:00
+
+root@ca:~# openssl ca -days 365 -extensions v3_req -policy policy_anything -in www.korea.com.csr –out www.korea.com.crt  ; 인증서 서명
+Using configuration from /usr/lib/ssl/openssl.cnf
+Enter pass phrase for /etc/ssl/korea-CA/private/cakey.pem:********
+Check that the request matches the signature
+Signature ok
+Certificate Details:
+        Serial Number: 13896244829359423044 (0xc0d9610bfdd3be44)
+        Validity
+            Not Before: Feb  8 23:15:02 2015 GMT
+            Not After : Feb  8 23:15:02 2016 GMT
+        Subject:
+            countryName               = KR
+            stateOrProvinceName       = Some-State
+            organizationName          = Internet Widgits Pty Ltd
+            commonName                = www.korea.com
+        X509v3 extensions:
+            X509v3 CRL Distribution Points:
+
+                Full Name:
+                  URI:http://ca.korea.com/crl/korea-CA.crl
+
+            X509v3 Basic Constraints:
+                CA:FALSE
+            X509v3 Key Usage:
+                Digital Signature, Non Repudiation, Key Encipherment
+Certificate is to be certified until Feb  8 23:15:02 2016 GMT (365 days)
+Sign the certificate? [y/n]:y
+
+
+1 out of 1 certificate requests certified, commit? [y/n]y
+Write out database with 1 new entries
+Data Base Updated
+
+root@ca:~# scp -P 2022 www.korea.com.crt root@www.korea.com:/etc/apache2/ssl  ; 서명한 인증서 웹서버로 복사 (ssh 포트가 변경되었음을 유의할 것)
+root@www.korea.com's password:********
+www.korea.com.crt                             100% 3592     3.5KB/s   00:00
+
+root@ca:~# scp -P 2022 /etc/ssl/korea-CA/cacert.pem root@www.korea.com:/etc/ssl /certs/korea-CA.crt    ; root인증기관의 인증서를 복사
+root@www.korea.com's password:********
+cacert.pem                                    100% 4555     4.5KB/s   00:00
+
+root@www:~# vim /etc/apache2/sites-enabled/default-ssl   ; 웹사이트 수정
+:set nu
+  1 <IfModule mod_ssl.c>
+  2 <VirtualHost _default_:443>
+  3         ServerAdmin webmaster@localhost
+  4         ServerName www.korea.com
+  5         DocumentRoot /var/www
+  6         <Directory />
+  7                 Options FollowSymLinks
+  8                 AllowOverride None
+  9         </Directory>
+.
+.
+{ 중략 } 
+.
+.
+ 41         #   SSLCertificateFile directive is needed.
+ 42         SSLCertificateFile    /etc/apache2/ssl/www.korea.com.crt
+ 43         SSLCertificateKeyFile /etc/apache2/ssl/www.korea.com.key
+ 44
+.
+.
+{ 중략 }
+.
+.
+ 54         #   Certificate Authority (CA):
+ 55         #   Set the CA certificate verification path where to find CA
+ 56         #   certificates for client authentication or alternatively one
+ 57         #   huge file containing all of them (file must be PEM encoded)
+ 58         #   Note: Inside SSLCACertificatePath you need hash symlinks
+ 59         #         to point to the certificate files. Use the provided
+ 60         #         Makefile to update the hash symlinks after changes.
+ 61         SSLCACertificatePath /etc/ssl/certs/
+ 62         SSLCACertificateFile /etc/ssl/certs/korea-CA.crt   ; 생략가능
+:x
+
+root@www:~# service apache2 restart   ; 웹서비스 재시작
+[ ok ] Restarting web server: apache2 ... waiting .
+
+client1.korea.com (또는 client2.korea.com) 클라이언트에 root 인증기관의 인증서를 ‘신뢰할 수 있는 루트 인증기관’에 등록
+
+
+C:\Users\user>ping www.korea.com   ; 웹서버와의 통신 가능여부 확인
+
+Ping www.korea.com [192.168.0.1] 32바이트 데이터 사용:
+192.168.0.1의 응답: 바이트=32 시간<1ms TTL=64
+192.168.0.1의 응답: 바이트=32 시간<1ms TTL=64
+
+
+https://www.korea.com 사이트 접속확인
+
+
+
+인증서의 인증경로가 위 그림과 정확히 일치하여야 함.
+6. 동적라우팅 구간에서의 IPsec VPN구성
+
+※  먼저 상호간의 GRE Tunnel을 구축 (터널구간 네트워크는 10.0.0.0/30)
+
+fw.korea.com 서버 구성
+root@fw:~# vim /etc/network/interfaces
+# The loopback network interface
+auto lo eth0 eth1 tun0
+iface lo inet loopback
+
+iface eth0 inet static
+        address 210.104.1.1
+        netmask 255.255.255.0
+        gateway 210.104.1.254
+
+iface eth1 inet static
+        address 192.168.0.254
+        netmask 255.255.255.0
+
+iface tun0 inet tunnel
+        mode gre
+        address 10.0.0.1
+        netmask 255.255.255.252
+        dstaddr 10.0.0.2
+        local 210.104.1.1
+        endpoint 211.34.67.129
+        ttl 255
+
+root@fw:~# ifup tun0   ; GRE 터널인터페이스 활성화
+
+remote.korea.com 서버 구성
+root@remote:~# vim /etc/network/interfaces
+# The loopback network interface
+auto lo eth0 eth1 tun0
+iface lo inet loopback
+
+iface eth0 inet static
+        address 211.34.67.129
+        netmask 255.255.255.192
+        gateway 211.34.67.190
+
+iface eth1 inet static
+        address 172.16.0.254
+        netmask 255.255.255.0
+
+iface tun0 inet tunnel
+        mode gre
+        address 10.0.0.2
+        netmask 255.255.255.252
+        dstaddr 10.0.0.1
+        local 211.34.67.129
+        endpoint 210.104.1.1
+        ttl 255
+
+root@remote:~# ifup tun0    ; GRE 터널인터페이스 활성화
+
+root@remote:~# ping 10.0.0.1  ; 상호 터널인터페이스 간의 통신 확인
+PING 10.0.0.1 (10.0.0.1) 56(84) bytes of data.
+64 bytes from 10.0.0.1: icmp_req=1 ttl=64 time=50.2 ms
+64 bytes from 10.0.0.1: icmp_req=2 ttl=64 time=13.6 ms
+64 bytes from 10.0.0.1: icmp_req=3 ttl=64 time=31.5 ms
+^C
+--- 10.0.0.1 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2004ms
+rtt min/avg/max/mdev = 13.608/31.806/50.263/14.966 ms
+
+fw.korea.com 서버 정적라우팅 테이블 추가
+root@fw:~# vim /etc/rc.local  
+#!/bin/sh -e
+#
+# rc.local
+#
+# This script is executed at the end of each multiuser runlevel.
+# Make sure that the script will "exit 0" on success or any other
+# value on error.
+#
+# In order to enable or disable this script just change the execution
+# bits.
+#
+# By default this script does nothing.
+route add -net 172.16.0.0/24 gw 10.0.0.2   ; 라우팅 테이블 추가
+exit 0
+
+
+root@fw:~# service rc.local start  ; 추가한 라우팅 테이블 적용
+root@fw:~# netstat -rn
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags   MSS Window  irtt Iface
+0.0.0.0         210.104.1.254   0.0.0.0         UG        0 0          0 eth0
+10.0.0.2        0.0.0.0         255.255.255.255 UH        0 0          0 tun0
+172.16.0.0      10.0.0.2        255.255.255.0   UG        0 0          0 tun0
+192.168.0.0     0.0.0.0         255.255.255.0   U         0 0          0 eth1
+210.104.1.0     0.0.0.0         255.255.255.0   U         0 0          0 eth0
+
+remote.korea.com 서버 정적라우팅 테이블 추가
+root@remote:~# vim /etc/rc.local
+#!/bin/sh -e
+#
+# rc.local
+#
+# This script is executed at the end of each multiuser runlevel.
+# Make sure that the script will "exit 0" on success or any other
+# value on error.
+#
+# In order to enable or disable this script just change the execution
+# bits.
+#
+# By default this script does nothing.
+route add -net 192.168.0.0/24 gw 10.0.0.1
+exit 0
+
+root@remote:~# service rc.local start   
+root@remote:~# netstat -rn
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags   MSS Window  irtt Iface
+0.0.0.0         211.34.67.190   0.0.0.0         UG        0 0          0 eth0
+10.0.0.1        0.0.0.0         255.255.255.255 UH        0 0          0 tun0
+172.16.0.0      0.0.0.0         255.255.255.0   U         0 0          0 eth1
+192.168.0.0     10.0.0.1        255.255.255.0   UG        0 0          0 tun0
+211.34.67.128   0.0.0.0         255.255.255.192 U         0 0          0 eth0
+
+
+
+root@remote:~# traceroute 192.168.0.1   ; 라우팅 경로 추적
+traceroute to 192.168.0.1 (192.168.0.1), 30 hops max, 60 byte packets
+ 1  10.0.0.1 (10.0.0.1)  25.788 ms  35.846 ms  46.344 ms
+ 2  192.168.0.1 (192.168.0.1)  56.611 ms  67.218 ms  77.671 ms
+
+fw.korea.com 서버 설정
+root@fw:~# vim /etc/ipsec.conf   ; ipsec 설정파일 편집
+:set nu
+ 57 conn    ipsec-vpn
+ 58         left=210.104.1.1
+ 59         right=211.34.67.129
+ 60         leftprotoport=gre
+ 61         rightprotoport=gre
+ 62         authby=rsasig
+ 63         leftrsasigkey=%cert
+ 64         rightrsasigkey=%cert
+ 65         leftcert=fw.korea.com.crt
+ 66         type=transport
+ 67         auto=start
+:x
+
+root@fw:~# service ipsec restart   ; openswan 재시작
+ipsec_setup: Stopping Openswan IPsec...
+ipsec_setup: Starting Openswan IPsec U2.6.37-g955aaafb-dirty/K3.2.0-4-amd64...
+
+remote.korea.com 서버 설정
+root@remote:~# vim /etc/ipsec.conf
+:set nu
+ 57 conn    ipsec-vpn
+ 58         left=211.34.67.129
+ 59         right=210.104.1.1
+ 60         leftprotoport=gre
+ 61         rightprotoport=gre
+ 62         authby=rsasig
+ 63         leftrsasigkey=%cert
+ 64         rightrsasigkey=%cert
+ 65         leftcert=remote.korea.com.crt
+ 66         type=transport
+ 67         auto=start
+:x
+
+root@remote:~# service ipsec restart
+ipsec_setup: Stopping Openswan IPsec...
+ipsec_setup: Starting Openswan IPsec U2.6.37-g955aaafb-dirty/K3.2.0-4-amd64...
+
+
+root@remote:~# ipsec auto --listcerts
+000
+000 List of X.509 End Certificates:
+000
+000 Feb 09 09:04:15 2015, count: 1
+000        subject: 'C=KR, ST=Some-State, O=Internet Widgits Pty Ltd, CN=remote.korea.com'
+000        issuer:  'C=KR, ST=Some-State, O=Internet Widgits Pty Ltd, CN=korea-CA'
+000        serial:   00:c0:d9:61:0b:fd:d3:be:43
+000        pubkey:   1024 RSA Key AwEAAaqwy, has private key
+000        validity: not before Feb 08 23:38:56 2015 ok
+000                  not after  Feb 08 23:38:56 2016 ok
+
+
+root@remote:~# ipsec showhostkey --left
+        # rsakey AwEAAaqwy
+        leftrsasigkey=0sAwEAAaqwyw5CjhbnZX5KDrbCwIJgyajlrzOS6WdvdSI3eWYzWUv+Nzoe8vSHQpQH3TPzmWOMmyhZuSWuQHJjWmBsTKTs9+CHD/rb2VnOvo+3TiBVtqahmqvKeGd4y27Fj8c5+aJaUv2ldZ/snIuKtMtRsIantkGISs87o2fZ8ouoz+3N
+
+root@remote:~# ipsec showhostkey --right
+        # rsakey AwEAAaqwy
+        rightrsasigkey=0sAwEAAaqwyw5CjhbnZX5KDrbCwIJgyajlrzOS6WdvdSI3eWYzWUv+Nzoe8vSHQpQH3TPzmWOMmyhZuSWuQHJjWmBsTKTs9+CHD/rb2VnOvo+3TiBVtqahmqvKeGd4y27Fj8c5+aJaUv2ldZ/snIuKtMtRsIantkGISs87o2fZ8ouoz+3N
+
