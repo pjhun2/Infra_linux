@@ -1,0 +1,128 @@
+웹서비스 ModSecurity 설치
+
+- ModSecurity 프로그램 다운로드
+
+설치하고자 하는 안정화 버전인 1.9.2는 다음 사이트에서 다운로드 받을 수 있다.
+http://www.modsecurity.org/download/modsecurity-apache-1.9.2.tar.gz 
+
+다운로드 받은 후 다음의 명령으로 압축 및 패키징을 해제한다.
+# cd /usr/local/src/
+# wget http://www.modsecurity.org/download/modsecurity-apache-1.9.2.tar.gz 
+# tar xvfz modsecurity-apache-1.9.2.tar.gz
+# cd modsecurity-apache-1.9.2
+
+여기서는 DSO 방식으로 설치를 한다.
+
+DSO 방식은 아파치 웹서버의 재설치 과정없이 기존에 운영되고 있는 아파치 웹서버에 모듈을
+동적으로 추가하는 방식이므로 기존에 아파치 웹서버를 이미 운영 중인 경우 DSO 방식을
+선택하는 것을 권장한다. 
+DSO 방식으로 설치하는 것은 아파치 버전에 상관없이 다음과 같이 설치 할 수 있다.
+
+(1) apxs를 이용하여 ModSecurity 모듈을 컴파일 및 설치하고, 설정을 자동으로 변경한다.
+
+  # cd /usr/local/src/modsecurity-apache-1.9.2
+  # /usr/local/apache2/bin/apxs -cia apache2/mod_security.c
+
+  위의 명령은 mod_security.c를 컴파일 하고, 공유객체를 웹서버 modules 디렉토리에
+  설치하고, 아파치 httpd.conf 설정파일에 적절한 LoadModule 줄을 추가한다.
+
+  참고로 apxs는 아파치 웹서버의 확장모듈을 컴파일하고 설치하는 도구로써, 여러 소스와 오브
+  젝트파일을 LoadModule 지시어로 실행 중인 아파치 서버로 읽어 들일 수 있는 동적공유객체(DSO)를 만든다. 
+  위의 결과로 modules 디렉토리에 mod_security.so가 생성되고 httpd.conf 파일에 
+  LoadModule security_module modules/mod_security.so  라인이 추가된다.
+
+(2) 위의 과정으로 모듈이 정상적으로 설치되었는지 확인한다.
+  [root:/usr/local/apache2]# ls -al modules
+  -rwxr-xr-x    1 root     root       308333 Jul 19 11:28 mod_security.so
+
+
+(3) 아파치 웹서버를 재구동한다.
+  # /usr/local/apache2/bin/apachectl stop
+  # /usr/local/apache2/bin/apachectl start
+
+
+만약 /usr/local/apache2/conf/modsecurity.conf 라는 이름으로 ModSecurity 웹방화벽을 위한 환경
+설정 파일을 별도로 만들었을 경우 httpd.conf 파일에 다음과 같이 이 파일을 포함시켜 줄 수 있다.
+
+Include conf/modsecurity.conf
+
+
+ModSecurity는 다양한 기능의 설정을 위해서 상당히 많은 지시자들이 존재하는데 이를 일일이 직접
+ 작성하여 적용하기는 쉽지 않을 것이다. 
+따라서 아래 ModSecurity 홈페이지에서 제공하는 Ruletemplate을 자신의 웹 환경에 맞게 커스트마이징 하는 것이
+ 보다 용이할 것이다.
+http://www.modsecurity.org/projects/rules/index.html 
+
+이 사이트에는 기본적인 Rule과 함께 PHP 환경, 출력 필터 등 몇 가지 Rule template가 있으므로
+이들을 참고해 보자.
+ 또는 본 고의 부록에 기본적인 Apache+PHP+MySQL 환경에 적합한 Rule 예를
+제시하고 있으므로 이를 참고해 보기 바란다.
+그리고 www.krcert.or.kr  사이트에서 웹방화벽 부분을 참고 바랍니다.
+
+
+ModSecurity Rule 설정 예
+
+##### Configuration #####
+SecFilterEngine On
+SecFilterScanPost On
+SecFilterScanOutput Off
+SecFilterOutputMimeTypes "(null) text/html text/plain"
+##### Validation #####
+SecFilterCheckURLEncoding On
+SecUploadDir /tmp
+SecUploadKeepFiles Off
+SecFilterCheckUnicodeEncoding Off
+SecFilterForceByteRange 1 255
+SecFilterDefaultAction "log,deny,status:403"
+##### Logging #####
+SecFilterDebugLog logs/modsec_debug.log
+SecFilterDebugLevel 1
+SecAuditEngine RelevantOnly
+SecAuditLog logs/modsec_audit.log
+##### Hardening #####
+# Body를 가진 GET 또는 HEAD 요청 차단(공격 가능성 높음)
+SecFilterSelective REQUEST_METHOD "^(GET|HEAD)$" chain
+SecFilterSelective HTTP_Content-Length "!^$"
+SecFilterSelective SERVER_PROTOCOL "!^HTTP/(0\.9|1\.0|1\.1)$"
+# Content-Length가 없는 POST 요청 차단
+SecFilterSelective REQUEST_METHOD "^POST$" chain
+SecFilterSelective HTTP_Content-Length "^$"
+SecFilterSelective HTTP_Transfer-Encoding "!^$"
+##### General #####
+SecFilterSelective HTTP_Host|HTTP_User-Agent|HTTP_Accept "^$"
+SecFilterSelective HTTP_User-Agent "(libwhisker|paros|wget|libwww|perl|curl|java)"
+##### SQL Injection Attacks #####
+SecFilterSignatureAction "log,deny,msg:'SQL Injection attack'"
+SecFilterSelective ARGS "delete[[:space:]]+from"
+SecFilterSelective ARGS "drop[[:space:]]+database"
+SecFilterSelective ARGS "drop[[:space:]]+table"
+SecFilterSelective ARGS "drop[[:space:]]+column"
+SecFilterSelective ARGS "drop[[:space:]]+procedure"
+SecFilterSelective ARGS "create[[:space:]]+table"
+SecFilterSelective ARGS "update.+set.+="
+SecFilterSelective ARGS "insert[[:space:]]+into.+values"
+SecFilterSelective ARGS "select.+from"
+SecFilterSelective ARGS "bulk[[:space:]]+insert"
+SecFilterSelective ARGS "union.+select"
+SecFilterSelective ARGS "or.+1[[:space:]]*=[[:space:]]1"
+SecFilterSelective ARGS "alter[[:space:]]+table"
+SecFilterSelective ARGS "or 1=1--'"
+SecFilterSelective ARGS "'.+--"
+SecFilterSelective ARGS "into[[:space:]]+outfile"
+SecFilterSelective ARGS "load[[:space:]]+data
+SecFilterSelective ARGS "/\*.+\*/"
+##### XSS Attacks #####
+SecFilterSignatureAction "log,deny,msg:'XSS attack'"
+SecFilterSelective ARGS "<script"
+SecFilterSelective ARGS "javascript:"
+SecFilterSelective ARGS "vbscript:"
+SecFilterSelective ARGS "document\.cookie"
+SecFilterSelective ARGS "document\.location"
+SecFilterSelective ARGS "document\.write"
+##### Command Execution #####
+SecFilterSignatureAction "log,deny,msg:'Command execution attack'"
+SecFilterSelective ARGS_VALUES ";[[:space:]]*(ls|id|pwd|wget)"
+##### PHP Attacks #####
+SecFilterSignatureAction "log,deny,msg:'PHP Injection Attacks'"
+SecFilterSelective ARGS_VALUES "^http:/"
+SecFilterSelective ARGS_NAMES "(^globals\[|^globals$)"
