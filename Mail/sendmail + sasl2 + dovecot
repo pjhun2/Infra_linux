@@ -1,0 +1,54 @@
+sendmail을 설치하기 전에 /etc/mailname 파일에 메일서버의 FQDN를 입력하도록 합니다.
+ 
+mail:~# apt-get install sendmail sendmail-base sendmail-bin sendmail-cf libsasl2-2 libsasl2-modules sasl2-bin dovecot-common dovecot-pop3d
+Reading package lists... DoneBuilding dependency treeReading state information... Donelibsasl2-2 is already the newest version.libsasl2-2 set to manually installed.libsasl2-modules is already the newest version.libsasl2-modules set to manually installed.The following extra packages will be installed:  db4.6-util libmysqlclient15off libpq5 make mysql-common openssl sensible-mdaSuggested packages:  make-doc ca-certificates sendmail-doc rmail logcheck resolvconfThe following NEW packages will be installed:  db4.6-util dovecot-common dovecot-pop3d libmysqlclient15off libpq5 make  mysql-common openssl sasl2-bin sendmail sendmail-base sendmail-bin  sendmail-cf sensible-mda0 upgraded, 14 newly installed, 0 to remove and 0 not upgraded.Need to get 0B/8509kB of archives.After this operation, 20.6MB of additional disk space will be used.Do you want to continue [Y/n]? Y
+ 
+보내는 메일 서버의 인증을 활성화 하기 위하여 sasl 서비스 설정 켜기
+ 
+mail:~# vim /etc/default/saslauthd
+      1 #      2 # Settings for saslauthd daemon      3 # Please read /usr/share/doc/sasl2-bin/README.Debian for details.      4 #      5      6 # Should saslauthd run automatically on startup? (default: no)      7 START=yes      8      9 # Description of this saslauthd instance. Recommended.     10 # (suggestion: SASL Authentication Daemon)     11 DESC="SASL Authentication Daemon"      .
+      .
+     28 # Only one option may be used at a time. See the saslauthd man page     29 # for more information.     30 #     31 # Example: MECHANISMS="pam"     32 MECHANISMS="pam"
+sendmail의 설정 파일인 sendmail.cf 파일 생성을 위한 sendmail.mc 파일을 편집하자
+ 
+mail:~# vim /etc/mail/sendmail.mc
+     50 dnl #     51 dnl # Daemon options - restrict to servicing LOCALHOST ONLY !!!     52 dnl # Remove `, Addr=' clauses to receive from any interface     53 dnl # If you want to support IPv6, switch the commented/uncommentd lines     54 dnl #     55 FEATURE(`no_default_msa')dnl     56 dnl DAEMON_OPTIONS(`Family=inet6, Name=MTA-v6, Port=smtp, Addr=::1')dnl     57 DAEMON_OPTIONS(`Family=inet,  Name=MTA-v4, Port=smtp, Addr=0.0.0.0')dnl       #  모든 네트워크에서 메일을 발송 가능하게 설정     58 dnl DAEMON_OPTIONS(`Family=inet6, Name=MSP-v6, Port=submission, M=Ea, Addr=::1')dnl     59 DAEMON_OPTIONS(`Family=inet,  Name=MSP-v4, Port=submission, M=Ea, Addr=0.0.0.0')dnl    #  모든 네트워크에서 메일을 발송 가능하게 설정     95 dnl # Dialup/LAN connection overrides     96 dnl #     97 include(`/etc/mail/m4/dialup.m4')dnl     98 include(`/etc/mail/m4/provider.m4')dnl     99 include(`/etc/mail/sasl/sasl.m4')dnl    # sasl 설정 파일을 include한다.
+(주) 아래 부분의 설정 내역의 위치를 조정한다.
+ 
+    101 dnl # Default Mailer setup    102 MAILER_DEFINITIONS    103 MAILER(`local')dnl    104 MAILER(`smtp')dnl    105    106 dnl # Masquerading options    107 FEATURE(`always_add_domain')dnl    108 MASQUERADE_AS(`debian')dnl    109 FEATURE(`allmasquerade')dnl    110 FEATURE(`masquerade_envelope')dnl
+위 설정을 아래와 같이 변경합니다.
+    101 dnl # Masquerading options    102 FEATURE(`always_add_domain')dnl    103 MASQUERADE_AS(`debian')dnl    104 FEATURE(`allmasquerade')dnl    105 FEATURE(`masquerade_envelope')dnl    106 dnl #    107 dnl # Default Mailer setup    108 MAILER_DEFINITIONS    109 MAILER(`local')dnl    110 MAILER(`smtp')dnl
+저장하고 종료한다.
+ 
+mail:~# vim /etc/mail/local-host-names    # 본 메일서버로 배달 가능한 호스트(도메인)을 등록한다.  localhostlocalhost.localdomainmail.hana.comhana.com
+hana-srv:~# sendmailconfig   #  sendmail.cf 파일을 생성한다.
+Configure sendmail with the existing /etc/mail/sendmail.conf? [Y] yReading configuration from /etc/mail/sendmail.conf.Validating configuration.Writing configuration to /etc/mail/sendmail.conf.Writing /etc/cron.d/sendmail.Configure sendmail with the existing /etc/mail/sendmail.mc? [Y] y.
+.
+Updating /etc/mail/access...Updating /etc/mail/aliases.../etc/mail/aliases: 13 aliases, longest 10 bytes, 145 bytes totalReload the running sendmail now with the new configuration? [Y] yReloading sendmail ...
+ 
+서비스를 재시작 합니다.
+ 
+mail:~# /etc/init.d/sendmail restartRestarting Mail Transport Agent (MTA): sendmail.
+mail:~# /etc/init.d/saslauthd restartStopping SASL Authentication Daemon: saslauthd.Starting SASL Authentication Daemon: saslauthd.
+SMTP 포트가 Listen 되었는지 확인해 보자
+ 
+hana-srv:~# netstat -nl | grep 25tcp        0      0 0.0.0.0:25              0.0.0.0:*               LISTEN
+로컬에서 접속해 보자
+ 
+hana-srv:~# telnet localhost 25Trying 127.0.0.1...Connected to localhost (127.0.0.1).Escape character is '^]'.220 hana-srv.hana.com ESMTP Sendmail 8.14.3/8.14.3/Debian-5; Thu, 2 Sep 2010 19:17:54 +0900; (No UCE/UBE) logging access from: localhost(OK)-localhost [127.0.0.1]helo hana.com250 hana-srv.hana.com Hello localhost [127.0.0.1], pleased to meet you
+quit
+ 
+ 
+받는 메일을 설정한다.
+ 
+hana-srv:~# vim /etc/dovecot/dovecot.conf     20     21 # Protocols we want to be serving: imap imaps pop3 pop3s managesieve     22 # If you only want to use dovecot-auth, you can set this to "none".     23 #protocols = imap imaps     24 protocols = pop3     25
+      .
+      .
+     34 #   protocol imap {     35 #     listen = *:10143     36 #     ssl_listen = *:10943     37 #     ..     38 #   }     39 #   protocol pop3 {     40 #     listen = *:10100     41 #     ..     42 #   }     43 #   protocol managesieve {     44 #     listen = *:12000     45 #     ..     46 #   }     47 listen = *:110     49 # Disable LOGIN command and all other plaintext authentications unless     50 # SSL/TLS is used (LOGINDISABLED capability). Note that if the remote IP     51 # matches the local IP (ie. you're connecting from the same computer), t        he     52 # connection is considered secure and plaintext authentication is allowe        d.     53 disable_plaintext_auth = no     54
+서비스를 재 시작 합니다.
+mail:~# /etc/init.d/dovecot restartRestarting IMAP/POP3 mail server: dovecot.
+mail:~# netstat -nl | grep 110tcp        0      0 0.0.0.0:110             0.0.0.0:*               LISTEN
+ 
+로컬에서 접속 해 봅시다.
+ 
+mail:~# telnet localhost 110Trying 127.0.0.1...Connected to localhost (127.0.0.1).Escape character is '^]'.+OK Dovecot ready.user root+OK
