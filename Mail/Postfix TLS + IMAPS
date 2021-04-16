@@ -1,0 +1,315 @@
+시나리오
+  mail.korea.com서버에 “korea.com”도메인의 DNS서비스를 설치한다.
+  ca.korea.com서버에 독립 실행형 인증기관을 설치한다.
+  mail.korea.com서버에 SMTP TLS/SSL Postfix서버를 설치하여 보안메일 서비스를 제공한다. 서버인증서는 ca.korea.com서버에서 발급받은 인증서를 사용하여 서비스를 수행하며 Clamav 패키지를 통하여 바이러스가 포함된 메일은 필터링 되도록 설정한다.
+  받는 메일서버는 mail.korea.com서버에 Dovcecot를 이용한 IMAPS를 구현하도록 한다. 여기에 사용한 인증서 또한 ca.korea.com서버로부터 발급받은 인증서를 사용하도록 한다.
+client에 Microsoft Live Essential 패키지 중 Windows Mail을 설치하여 메일을 주고받을 수 있도록 구성한다. 
+  
+1. mail.korea.com 서버 설정
+
+1-1. /etc/mailname 파일 수정
+root@mail:/# echo "mail.korea.com" > /etc/mailname
+
+1-2. 기본 메일 패키지인 exim4 제거
+root@mail:/# apt-get autoremove --purge exim4 exim4-base exim4-config exim4-daemon-light
+Reading package lists... Done
+Building dependency tree
+Reading state information... Done
+The following packages will be REMOVED:
+  bsd-mailx* exim4* exim4-base* exim4-config* exim4-daemon-light*
+0 upgraded, 0 newly installed, 5 to remove and 0 not upgraded.
+After this operation, 4,342 kB disk space will be freed.
+Do you want to continue [Y/n]? y
+
+1-3. 패키지 설치
+root@mail:/# apt-get install clamav clamav-freshclam clamsmtp postfix dovecot-imapd
+Reading package lists... Done
+Building dependency tree
+Reading state information... Done
+The following extra packages will be installed:
+  clamav-base clamav-daemon dovecot-common libclamav6 libltdl7
+  libmysqlclient16 libpq5 libtommath0 mysql-common ssl-cert
+Suggested packages:
+  clamav-docs ntp libclamunrar6 postfix-mysql postfix-pgsql postfix-ldap
+  postfix-pcre sasl2-bin resolvconf postfix-cdb ufw openssl-blacklist
+The following NEW packages will be installed:
+  clamav clamav-base clamav-daemon clamav-freshclam clamsmtp dovecot-common
+  dovecot-imapd libclamav6 libltdl7 libmysqlclient16 libpq5 libtommath0
+  mysql-common postfix ssl-cert
+0 upgraded, 15 newly installed, 0 to remove and 0 not upgraded.
+Need to get 0 B/15.6 MB of archives.
+After this operation, 33.9 MB of additional disk space will be used.
+Do you want to continue [Y/n]? y
+
+
+
+
+
+
+
+1-4. clamav 설정
+  Virus DB는 인터넷 연결이 가능해야 다운로드가 가능하므로 과제에서 제공되는 DB를 사용한다. (만약, 인터넷이 가능하다면 ‘root@mail:/# freshclam’ 명령으로 DB를 다운로드 하거나 업데이트 할 수 있다.)
+root@mail:/# cd /var/lib/clamav/          ; DB 저장 디렉터리
+root@mail:/var/lib/clamav# tar xvfj /home/manager/clamav-db.tar.bz2
+bytecode.cvd
+daily.cvd
+main.cvd
+mirrors.dat
+
+1-5. clamav 테스트
+root@mail:/# apt-get install clamav-testfiles     ; sample 바이러스 파일 설치
+
+root@mail:/# clamscan /usr/share/clamav-testfiles/
+LibClamAV Warning: **************************************************
+LibClamAV Warning: ***  The virus database is older than 7 days!  ***
+LibClamAV Warning: ***   Please update it as soon as possible.    ***
+LibClamAV Warning: **************************************************
+/usr/share/clamav-testfiles/clam.exe.szdd: ClamAV-Test-File FOUND
+/usr/share/clamav-testfiles/clam.ea06.exe: ClamAV-Test-File FOUND
+/usr/share/clamav-testfiles/clam.impl.zip: ClamAV-Test-File FOUND
+.
+.
+/usr/share/clamav-testfiles/clam-v3.rar: OK
+
+----------- SCAN SUMMARY -----------
+Known viruses: 2288143
+Engine version: 0.97.6
+Scanned directories: 1
+Scanned files: 46
+Infected files: 44                 ; 44개의 바이러스 검출
+Data scanned: 12.48 MB
+Data read: 6.21 MB (ratio 2.01:1)
+Time: 7.861 sec (0 m 7 s)
+
+1-6. postfix TLS 개인키 및 인증서 요청파일 생성
+root@mail:/# mkdir /etc/ssl/mail
+root@mail:/# cd /etc/ssl/mail
+root@mail:/etc/ssl/mail# openssl req -out mail.korea.com.csr -new -newkey rsa:2048 -sha1 -nodes -keyout mail.korea.com.key
+Generating a 2048 bit RSA private key
+......+++
+........................+++
+writing new private key to 'mail.korea.com.key'
+-----
+You are about to be asked to enter information that will be incorporated
+into your certificate request.
+What you are about to enter is what is called a Distinguished Name or a DN.
+There are quite a few fields but you can leave some blank
+For some fields there will be a default value,
+If you enter '.', the field will be left blank.
+-----
+Country Name (2 letter code) [AU]:KR
+State or Province Name (full name) [Some-State]:Seoul
+Locality Name (eg, city) []:Seoul
+Organization Name (eg, company) [Internet Widgits Pty Ltd]:
+Organizational Unit Name (eg, section) []:
+Common Name (eg, YOUR name) []:mail.korea.com    ; CN이름은 메일서버 FQDN
+Email Address []:
+
+Please enter the following 'extra' attributes
+to be sent with your certificate request
+A challenge password []:
+An optional company name []:
+
+  인증서 요청파일을 ca.korea.com서버로 전송하기 위하여 manager계정 홈디렉터리로 복사한다.
+root@mail:/etc/ssl/mail# cp mail.korea.com.csr /home/manager/
+
+1-7. postfix TLS 인증서 생성
+  ca.korea.com서버의 윈도우 탐색기에서 mail.korea.com서버의 manager 계정으로 ftp접속을 한다.
+
+
+  인증서 요청파일(mail.korea.com.csr) 파일을 바탕화면으로 복사한 후 메모장으로 열어 클립보드에 복사해 둔다.
+
+
+  아래 절차에 따라 인증서를 발급 받는다.
+
+
+
+
+
+
+
+  요청된 인증서를 발급한다.
+
+
+  발급된 인증서를 다운로드한다.
+
+
+
+
+
+“mail.korea.com.crt” 이름으로 인증서를 바탕화면에 저장한다.
+
+
+
+
+
+  바탕화면에 저장된 메일서버 인증서와 루트인증서를 mail.korea.com서버의 manager 계정의 홈 디렉터리에 복사한다. 
+
+  메일서버 인증서를 “/etc/ssl/mail” 폴더에 복사하고, 루트인증서를 “/etc/ssl/certs” 디렉터리에 복사한다.
+root@mail:/etc/ssl/mail# cp /home/manager/mail.korea.com.crt ./
+root@mail:/etc/ssl/mail# cp /home/manager/korea-CA-CA.crt /etc/ssl/certs/
+
+1-8. Postfix 메일서버 설정
+root@mail:/# vim /etc/postfix/main.cf
+:set nu
+.
+.
+ 20 # TLS parameters
+ 21 smtpd_tls_cert_file=/etc/ssl/mail/mail.korea.com.crt
+ 22 smtpd_tls_key_file=/etc/ssl/mail/mail.korea.com.key
+ 23 smtpd_use_tls=yes
+.
+.
+ 27 # See /usr/share/doc/postfix/TLS_README.gz in the postfix-doc package for
+ 28 # information on enabling SSL in the smtp client.
+ 29
+ 30 myhostname = mail.korea.com
+ 31 alias_maps = hash:/etc/aliases
+ 32 alias_database = hash:/etc/aliases
+ 33 myorigin = /etc/mailname
+ 34 mydestination = mail.korea.com, korea.com, , localhost  ; 메일을 수신할 도메인
+ 35 relayhost =
+ 36 mynetworks = 127.0.0.0/8 [::ffff:127.0.0.0]/104 [::1]/128 211.34.67.0/25 125
+    .249.160.0/24   ; 내 서브넷 추가
+ 37 mailbox_command = procmail -a "$EXTENSION"
+ 38 mailbox_size_limit = 0
+ 39 recipient_delimiter = +
+ 41
+ 42 content_filter = scan:127.0.0.1:10026    ; clamsmtp proxy 설정
+:x
+
+root@mail:/# vim /etc/postfix/master.cf
+:set nu
+109  ; 바이러스 필터링 관련 정책 등록
+110 scan unix -       -       n       -       16       smtp
+111    -o smtp_data_done_timeout=1200
+112    -o smtp_send_xforward_command=yes
+113    -o disable_dns_lookups=yes
+114 127.0.0.1:10025 inet n       -       n       -       16       smtpd
+115    -o content_filter=
+116    -o local_recipient_maps=
+117    -o relay_recipient_maps=
+118    -o smtpd_restriction_classes=
+119    -o smtpd_client_restrictions=
+120    -o smtpd_helo_restrictions=
+121    -o smtpd_sender_restrictions=
+122    -o smtpd_recipient_restrictions=permit_mynetworks,reject
+123    -o mynetworks_style=host
+124    -o smtpd_authorized_xforward_hosts=127.0.0.0/8
+:x
+
+서비스 재시작
+root@mail:/# service clamav-daemon restart
+Stopping ClamAV daemon: clamd.
+Starting ClamAV daemon: clamd LibClamAV Warning: **************************************************
+LibClamAV Warning: ***  The virus database is older than 7 days!  ***
+LibClamAV Warning: ***   Please update it as soon as possible.    ***
+LibClamAV Warning: **************************************************
+.
+root@mail:/# service clamsmtp restart
+Restarting virus filtering SMTP proxy: clamsmtpd.
+root@mail:/# service postfix restart
+Stopping Postfix Mail Transport Agent: postfix.
+Starting Postfix Mail Transport Agent: postfix.
+
+1-9. Dovecot IMAPS 설정
+root@mail:/# vim /etc/dovecot/dovecot.conf
+:set nu
+  22 # Protocols we want to be serving: imap imaps pop3 pop3s managesieve
+  23 # If you only want to use dovecot-auth, you can set this to "none".
+  24 #protocols = imap imaps
+  25 protocols = imaps
+.
+.
+  47 listen = *
+  48
+.
+.
+  94 # SSL/TLS support: yes, no, required. </usr/share/doc/dovecot-common/wiki/S     SL.txt>
+  95 ssl = yes
+  96
+  97 # PEM encoded X.509 SSL/TLS certificate and private key. They're opened bef     ore
+  98 # dropping root privileges, so keep the key file unreadable by anyone but
+  99 # root.
+ 100 ssl_cert_file = /etc/ssl/mail/mail.korea.com.crt
+ 101 ssl_key_file = /etc/ssl/mail/mail.korea.com.key
+ 102
+ 103 # If key file is password protected, give the password here. Alternatively
+ 104 # give it when starting dovecot with -p parameter. Since this file is often
+ 105 # world-readable, you may want to place this setting instead to a different
+ 106 # root owned 0600 file by using !include_try <path>.
+ 107 #ssl_key_password =
+ 108
+ 109 # File containing trusted SSL certificate authorities. Set this only if you
+ 110 # intend to use ssl_verify_client_cert=yes. The CAfile should contain the
+ 111 # CA-certificate(s) followed by the matching CRL(s).
+ 112 ssl_ca_file = /etc/ssl/certs/korea-CA-CA.crt
+.
+.
+ 224 #   mail_location = maildir:~/Maildir
+ 225    mail_location = mbox:~/mail:INBOX=/var/mail/%u
+ 226 #   mail_location = mbox:/var/mail/%d/%1n/%n:INDEX=/var/indexes/%d/%1n/%n
+ 227 #
+ 228 # </usr/share/doc/dovecot-common/wiki/MailLocation.txt>
+ 229 #
+:x
+
+root@mail:/# service dovecot restart
+2. 메일 클라이언트 설정
+
+  샘플 바이러스를 클라이언트로 복사하기 위하여 ‘manger’ 계정의 홈 디렉터리로 복사
+
+root@mail:/# cp /usr/share/clamav-testfiles/clam.exe /home/manager/
+
+  샘플 바이러스를 바탕화면에 복사해 둔다.
+
+
+  루트인증서 설치를 컴퓨터계정의 ‘신뢰할 수 있는 루트 인증기관’에 설치한다.
+
+
+
+ 
+ Windows Mail 설정
+
+
+
+
+
+  바이러스가 첨부된 메일을 발송한다.
+
+
+ 메일서버의 로그를 모니터링한다.
+
+root@mail:/etc/ssl/certs# echo "" > /var/log/mail.log
+root@mail:/etc/ssl/certs# tail -F /var/log/mail.log
+Jun  6 23:28:32 mail postfix/smtp[6580]: 27FAD2DD55: to=<root@korea.com>, relay=127.0.0.1[127.0.0.1]:10026, delay=0.37, delays=0.26/0.01/0.05/0.05, dsn=2.0.0, status=sent (250 Virus Detected; Discarded Email)
+Jun  6 23:28:32 mail postfix/qmgr[5927]: 27FAD2DD55: removed
+Jun  6 23:28:32 mail clamsmtpd: 100000: from=manager@korea.com, to=root@korea.com, status=VIRUS:ClamAV-Test-File
+
+root@mail:/etc/ssl/certs# cat /var/log/clamav/clamav.log
+Thu Jun  6 22:49:51 2013 -> +++ Started at Thu Jun  6 22:49:51 2013
+Thu Jun  6 22:49:51 2013 -> clamd daemon 0.97.6 (OS: linux-gnu, ARCH: i386, CPU: i486)
+Thu Jun  6 22:49:51 2013 -> Log file size limited to -1 bytes.
+Thu Jun  6 22:49:51 2013 -> Reading databases from /var/lib/clamav
+Thu Jun  6 22:49:51 2013 -> Not loading PUA signatures.
+Thu Jun  6 22:49:51 2013 -> Bytecode: Security mode set to "TrustSigned".
+Thu Jun  6 22:49:56 2013 -> Loaded 2288143 signatures.
+Thu Jun  6 22:49:57 2013 -> LOCAL: Unix socket file /var/run/clamav/clamd.ctl
+Thu Jun  6 22:49:57 2013 -> LOCAL: Setting connection queue length to 15
+Thu Jun  6 22:49:57 2013 -> Limits: Global size limit set to 104857600 bytes.
+Thu Jun  6 22:49:57 2013 -> Limits: File size limit set to 26214400 bytes.
+Thu Jun  6 22:49:57 2013 -> Limits: Recursion level limit set to 16.
+Thu Jun  6 22:49:57 2013 -> Limits: Files limit set to 10000.
+Thu Jun  6 22:49:57 2013 -> Archive support enabled.
+Thu Jun  6 22:49:57 2013 -> Algorithmic detection enabled.
+Thu Jun  6 22:49:57 2013 -> Portable Executable support enabled.
+Thu Jun  6 22:49:57 2013 -> ELF support enabled.
+Thu Jun  6 22:49:57 2013 -> Mail files support enabled.
+Thu Jun  6 22:49:57 2013 -> OLE2 support enabled.
+Thu Jun  6 22:49:57 2013 -> PDF support enabled.
+Thu Jun  6 22:49:57 2013 -> HTML support enabled.
+Thu Jun  6 22:49:57 2013 -> Self checking every 3600 seconds.
+Thu Jun  6 23:28:32 2013 -> /var/spool/clamsmtp/clamsmtpd.6lTgw2: ClamAV-Test-File(27875f3775e25abcd8544ad7a4cc511d:2419) FOUND
+
+
+  받은 편지함에 메일이 도착하지 않음을 확인할 수 있습니다.
