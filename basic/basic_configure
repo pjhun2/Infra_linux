@@ -1,0 +1,27 @@
+#Default Host  
+apt install vim ssh net-tools dnsutils curl tcpdump ldap-utils -y // 필요한 default package 설치  
+
+configure /etc/ssh/sshd_config  
+line 32  
+
+PermitRootLogin yes // SSH ROOT로 접근이 가능하도록 허용  
+
+#All Host  
+
+configure
+/etc/network/interface // IP 세팅  
+ex)
+address 192.168.0.100/24
+gateway 192.168.0.1
+
+/etc/resolv.conf // 질의할 dns 서버 주소 입력  
+ex)
+nameserver 192.168.0.150 // dns 서버 주소 지정  
+
+
+/etc/sysctl.conf // 포워딩이 필요한 서버에서 설정  
+ex) gateway srv
+net.ipv4.ip_forward=1 // 주석 해제하여 config 저장  
+sysctl -p // terminal에서 적용  
+
+
