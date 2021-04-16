@@ -1,1 +1,58 @@
-#postgres
+File
+apt install postgresql-11 -y
+#su postgres
+$createuser –P root  
+*PW: Passw0rd$
+$createdb -O office_users –E utf-8 db
+$exit
+#cd /cert/
+#openssl req -new -out post.req -newkey rsa:1024 -nodes -keyout post.key
+*CN=192.168.1.2
+#openssl ca -in post.req -out post.crt
+#chown postgres:postgres -R /cert/post.*
+#chmod 600 /cert/post.*
+#chmod 755 /etc/ssl/root.crt
+#vim /etc/postgresql/11/main/pg_hba.conf
+ 
+#vim /etc/postgresql/9.6/main/postgresql.conf
+ 
+ 
+#systemctl restart postgresql
+ 
+vim postgres.sql
+ 
+#psql –U root office_users < /root/postgres.sql
+
+
+
+Postgresql replication ( FILE ) MASTER SERVER
+Vim /etc/postgresql/11/postgresql.conf
+ 
+ 
+
+Vim /etc/postgresql/11/pg_hba.conf
+ 
+
+Su postgre
+Psql -d postgres
+Postgres=# CREATE ROLE replicate with replication PASSWORD ‘Passw0rd$’ login;
+CREATE ROLE ; 성공 메시지
+
+Postgresql replication ( PRIVATE ) Slave SERVER
+apt install postgresql-11 -y
+
+vi /etc/postgresql/11/postgresql.conf
+ 
+ 
+Su postgre
+Cd /var/lib/postgresql/11/main/
+rm -rf ./*
+pg_basebackup -h 192.168.1.2 -D /var/lib/postgresql/11/main -U replicate -P -v -X stream
+exit
+
+vim /etc/postgresql/11/recovery.conf
+ 
+
+Services postgresql restart
+Select 로 성공되었는지 확인
+
