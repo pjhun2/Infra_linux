@@ -1,0 +1,270 @@
+mod_cband 모듈은 apache2 버전 에서 홈페이지의 히트(hit)수 제한 및 도메인별 대역폭제한등 트래픽을 관리하기 위해 사용하는 모듈 입니다.
+
+
+1. 소스 다운 및 설치 예제
+[root@localhost]# cd /usr/local/src/
+[root@localhost]# wget http://cband.linux.pl/download/mod-cband-0.9.7.5.tgz  
+[root@localhost]# tar xvfpz mod-cband-0.9.7.5.tgz 
+[root@localhost]# cd mod-cband-0.9.7.5
+[root@localhost]# ./configure --with-apxs=/usr/local/apache2/bin/apxs
+[root@localhost]# make
+[root@localhost]# make install
+
+
+2. 설치확인
+
+  - httpd.conf 파일에서 모듈부분에 아래와 같이 줄이 추가된것을 볼 수 있습니다.
+
+     LoadModule cband_module       modules/mod_cband.so
+
+  - apache2/modules 디렉토리에서도  mod_cband.so  파일이 추가 된 것을 볼수 있습니다.
+
+
+3. 기본 설정 및 예제 (apache2/conf/httpd.conf)
+
+====================================
+  <Location /cband-status> 
+     SetHandler cband-status
+     Order deny,allow
+     Deny from all
+     Allow from 허용 아이피(예: 192.168.100.10)
+  </Location>
+
+  <Location /cband-status-me> 
+    SetHandler cband-status-me
+  </Location>
+
+<VirtualHost *>
+   ServerName testmydomain.co.kr    
+   Document /home/testmydomain/public_html
+   CBandLimit 100Mi
+   CBandPeriod 1D
+   CBandExceededURL http://testmydomain.co.kr/traffic-over.html
+</VirtualHost>
+======================================
+위 설정파일은 testmydomain.co.kr 도메인에 하루에 100M의 트래픽을 설정하는 예제입니다.
+하루에 100M를 초과했다면, CBandExceededURL에서 지정된 페이지가 뜨며, 지정하지 않았다면, 503 에러 페이지가 뜨게됩니다.
+참고로 제한을 하지 않고 보기만 한다면, CBandPeriod 부분만 있으면 됩니다.
+
+4. 속도 제한 설정 예
+
+==============================
+<VirtualHost *>
+   ServerName file.testmydomain.co.kr   
+   Document /home/testmydomain/file
+   CBandSpeed 1024 10 30
+   CBandRemoteSpeed 20kb/s 3 30
+</VirtualHost>
+==============================
+위 설정은 file.testmydomain.co.kr 도메인에 대해서 속도를 1024kbps 로 제한, 초당 10번 연결, 동시접속자를 30으로 제한하는 예제
+
+
+5. 사용량 확인.
+   http://도메인/cband-status  
+   http://도메인/cband-status-me 
+
+
+6. 지시자 및 단위 설명
+  1) 단위.
+    * 전송속도 단위
+          o kbps, Mbps, Gbps - bits per second: 1024, 1024*1024 , 1024*1024*1024 bps
+          o kb/s, Mb/s, Gb/s - bytes per second:  1024, 1024*1024, 1024*1024*1024 b/s
+          o 기본 : kbps
+
+    * 트래픽 쿼터 단위
+          o K, M, G - bytes: 1000, 1000*1000 ,1000*1000*1000 bytes
+          o Ki, Mi, Gi - bytes: 1024, 1024*1024, 1024*1024*1024 bytes
+          o 기본 : K
+
+    * 시간(기간) 단위 
+          o S, M, H, D, W - 초, 분, 시간, 일, 주
+          o 기본 : S
+
+ 
+
+  2) 지시자들
+
+
+     * 이름 : CBandDefaultExceededCode
+         설명 : 제한을 초과했을시 보여줄 에러 코드
+         문맥 : Server config
+         문법 : CBandDefaultExceededCode HTTP_CODE
+         예제 : CBandDefaultExceededCode 509
+
+
+     * 이름 : CBandScoreFlushPeriod
+         설명 : scoreboard 파일에 기록할 요청수, mod_cband 의 성능에 영향을 준다.
+         기본값 : 1
+         문맥 : Server config
+         문법 : CBandScoreFlushPeriod 요청수
+         예제 : CBandScoreFlushPeriod 100  ( 매 100번의 요청에 한번씩 scoreboard 파일에 기록)
+
+     * 이름 : CBandSpeed
+         설명 : 가상호스트 도메인의 최대 속도, 요청수, 접속수  설정
+         문맥 : <Virtualhost>
+         문법 : CBandSpeed kbps rps max_conn
+                kbps - 초당 최대 전송속도
+                rps - 초당 최대 요청수
+                max_conn - 최대 동시 접속수 
+         예제 : CBandSpeed 1024 10 30
+                 최대 1024kbps전송속도로 제한, 초당 10개의 요청 처리, 동시 접속을 30개로 제한.
+
+     * 이름 : CBandRemoteSpeed
+         설명 : 접속자(IP)의 최대속도, 요청수, 접속수 제한 (CBandSpeed와 비슷하지만, 접속자당 설정)
+         문맥 : <Virtualhost>
+         문법 : CBandRemoteSpeed kbps rps max_conn
+                  kbps - 초당 최대 전송속도
+                  rps - 초당최대 요청수
+                  max_conn - 최대 동시 접속수
+         예제 : CBandRemoteSpeed 20kb/s 3 3
+                  접속자(ip)에대해 최대 20kb/s , 초당 3개의 요청, 동시 접속 3개로 제한.
+
+      * 이름 : CBandClassRemoteSpeed
+         설명 : 정의한 class(ip 범위)에 대해 최대속도, 요청수, 접속수 제한
+         문맥 : <Virtualhost>
+         문법 : CBandClassRemoteSpeed class_name kbps rps
+                  class_name - 이미 정의한 클래스 이름 (IP범위)
+                  kbps - 초당 최대 전송속도
+                  rps - 초당 최대 요청수
+                  max_conn - 최대 동시 접속수
+         예제 : <CBandClass googlebot_class>
+                    CBandClassDst 66.249.64/24
+                    CBandClassDst 66.249.65/24
+                    CBandClassDst 66.249.79/24
+                  </CBandClass>
+                        CBandClassRemoteSpeed googlebot_class 20kb/s 2 3
+                        위에서 정의한 클래스(googlebot_class)의 요청에는 20kb/s 의 전송속도, 
+                       초당 3개의 요청, 동시 접속 3개로 제한.
+
+     *   이름 : CBandRandomPulse
+         설명 : 속도 제한을 위해서 임의의 파형을 생성한 다음 처리하는 mod_cband의 처리 방법이다.
+                   부하가 많을때는 자동 Off된다.
+         문맥 : Global
+         문법 : CBandRandomPulse On/Off
+
+     *  이름 : CBandLimit
+         설명 : 제한할 전송량을 설정한다. (기간은 CBandPeriod 에서 설정)
+         문맥 : <Virtualhost>
+         문법 : CBandLimit limit
+                  limit - 전송량, 사용단위: K (kilo), M (mega), G (giga), Ki (kibi), Mi (mebi), Gi (gibi)
+         예제 : CBandLimit 10M
+                    전송양을 10M(10*1000*1000bytes)로 제한한다.
+                  CBandLimit 10Mi
+                    전송양을 10M(10*1024*1024bytes)로 제한한다.
+
+     *  이름 : CBandClassLimit
+         설명 : 정의한 class(ip범위)에 대해 제한할 전송량 설정.
+         문맥 : <Virtualhost>
+         문법 : CBandClassLimit class_name limit
+                  class_name - 이미 정의한 클래스 이름(ip범위)
+                  limit - 전송량, 사용단위: K (kilo), M (mega), G (giga), Ki (kibi), Mi (mebi), Gi (gibi)
+
+      * 이름 : CBandExceededURL
+         설명 : 제한을 초과했을시 보여줄 URL, 지정하지 않으면 503 에러 발생 ( 가상호스트에서 ) 
+         문맥 : <Virtualhost>
+         문법 : CBandExceededURL URL
+
+      * 이름 : CBandExceededSpeed
+         설명 : 전송양을 초과했을시 , 전송속도 제한 설정.
+         문맥 : <Virtualhost>
+         문법 : CBandExceededSpeed kbps rps max_conn
+                  kbps - 초당 최대 전송속도
+                  rps - 초당 최대 요청수
+                  max_conn - 최대 동시 접속수
+
+       * 이름 : CBandScoreboard
+         설명 : 가상호스트의 scoreboard 파일 지정. (성능향상을 위해 필요)
+         문맥 : <Virtualhost>
+         문법 : CBandScoreboard path 
+                  (path는 아파치(nobody또는 apache)권한으로 쓰기가능해야 함)
+
+      * 이름 : CBandPeriod
+         설명 : 용량제한기간(이 기간이 지나면, 측정되었던 용량은 삭제됨)
+         문맥 : <Virtualhost>
+         문법 : CBandPeriod period
+                  period - 사용단위: S (초), M (분), H (시간), D (일), W (주)
+         예제 : CBandPeriod 1W  (1주일)
+                  CBandPeriod 14D  (14일)
+                  CBandPeriod 60M  (60분)
+
+      * 이름 : CBandPeriodSlice
+         설명 : 기간이 길때는 나눌 기간을 명시한다. 
+         기본값 : slice_len = limit
+         문맥 : <Virtualhost>
+         문법 : CBandPeriodSlice slice_length
+         예제 : CBandLimit 100G
+                  CBandPeriod 4W
+                  CBandPeriodSlice 1W
+                   4주는 1주일 단위로 나뉜다(4W/1W = 4). 용량은 100G/4=25G 
+                   1주에 25G, 2주째 50G 이렇게 나눠 처리 됨.
+
+      * 이름 : <CBandUser>
+         설명 : 새로운 cband 가상 사용자 설정
+         문맥 : Server config
+         문법 : <CBandUser user_name>
+
+     * 이름 : CBandUserSpeed
+         설명 : cband 가상 사용자의 속도, 요청수, 동시 접속수 제한 
+         문맥 : <CBandUser>
+         문법 : CBandUserSpeed kbps rps max_conn
+                  kbps - 초당 최대 전송속도
+                  rps - 초당 최대 요청수
+                  max_conn - 최대 동시 접속수
+         예제 : CBandUserSpeed 100kb/s 10 5
+
+
+     * 이름 : CBandUserLimit
+         설명 : cband 가상 사용자의 저송 용량 제한.
+         문맥 : <CBandUser>
+         문법 : CBandUserLimit limit
+                  limit - 사용용량, 사용단위: K (kilo), M (mega), G (giga), Ki (kibi), Mi (mebi), Gi (gibi)
+         예제 : CBandUserLimit 10M
+                  CBandUserLimit 10Mi
+
+     * 이름 : CBandUserClassLimit
+         설명 : cband 가상 사용자의 정의한 class(ip범위)에 대해 제한할 전송량 설정
+         문맥 : <CBandUser>
+         문법 : CBandUserClassLimit class_name limit
+                  class_name - 지정한 class(IP범위)이름
+                  limit -사용용량, 사용단위: K (kilo), M (mega), G (giga), Ki (kibi), Mi (mebi), Gi (gibi)
+
+      * 이름 : CBandUserExceededURL
+         설명 : cband 가상 사용자의, 제한을 초과했을시 보여줄 URL,
+                   지정하지 않으면 503 에러 발생 ( 가상호스트에서 ) 
+         문맥 : <CBandUser>
+         문법 : CBandUserExceededURL URL
+
+     * 이름 : CBandUserExceededSpeed
+         설명 : cband 가상 사용자의, 전송양을 초과했을시 , 전송속도 제한 설정.
+         문맥 : <CBandUser>
+         문법 : CBandUserExceededSpeed kbps rps max_conn
+                  kbps - 초당 최대 전송속도
+                  rps - 초당 최대 요청수
+                  max_conn - 최대 동시 접속수
+
+     * 이름 : CBandUserScoreboard
+         설명 : cband 가상 사용자의, scoreboard 파일 지정.
+         문맥 : <CBandUser>
+         문법 : CBandUserScoreboard path
+                  (path는 아파치(nobody또는 apache)권한으로 쓰기가능해야 함)
+
+    *  이름 : CBandUserPeriod
+         설명 : cband 가상 사용자의, 용량제한기간(이 기간이 지나면, 측정되었던 용량은 삭제됨.)
+         문맥 : <CBandUser>
+         문법 : CBandUserPeriod period
+                  period - 사용단위: S (초), M (분), H (시간), D (일), W (주)
+         예제 : CBandUserPeriod 1W
+                  CBandUserPeriod 14D
+                  CBandUserPeriod 60M
+
+      * 이름 : CBandUserPeriodSlice
+         설명 : cband 가상 사용자의, 기간을 나눌 기간 명시
+         기본값 : slice_len = limit
+         문맥 : <CBandUser>
+         문법 : CBandUserPeriodSlice slice_length
+         예제 : CBandUserLimit 100G
+                  CBandUserPeriod 4W
+                  CBandUserPeriodSlice 1W
+                   4주는 1주일 단위로 나뉜다(4W/1W = 4). 용량은 100G/4=25G 
+                   1주에 25G, 2주째 50G 이렇게 나눠 처리 된다.
+
