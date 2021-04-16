@@ -1,1 +1,58 @@
-#squid
+ebian Linux에 기본적으로 포함된 프록시 서버인 Squid Proxy Service의 기본적인 설정을 배워 보기로 합니다.
+ 
+root@squid:~# apt-get install squidReading package lists... DoneBuilding dependency treeReading state information... DoneThe following packages were automatically installed and are no longer required:  liburi-perl libfont-afm-perl libmailtools-perl libhtml-parser-perl libapr1  libtimedate-perl libhtml-format-perl libhtml-tree-perl libwww-perl  libhtml-tagset-perl libaprutil1Use 'apt-get autoremove' to remove them.Suggested packages:  squidclient squid-cgi logcheck-database resolvconf smbclient winbindThe following NEW packages will be installed:  squid0 upgraded, 1 newly installed, 0 to remove and 0 not upgraded.Need to get 0 B/765 kB of archives.After this operation, 1,933 kB of additional disk space will be used.Preconfiguring packages ...Selecting previously deselected package squid.(Reading database ... 26060 files and directories currently installed.)Unpacking squid (from .../squid_2.7.STABLE9-2.1_i386.deb) ...Processing triggers for man-db ...Setting up squid (2.7.STABLE9-2.1) ...Restarting Squid HTTP proxy: squid.
+root@squid:~#vim /etc/squid/squid.conf
+:set nu
+    600 #Recommended minimum configuration:    601 acl all src all                                          602 acl manager proto cache_object    603 acl localhost src 127.0.0.1/32    604 acl to_localhost dst 127.0.0.0/8 0.0.0.0/32    605 #    606 # Example rule allowing access from your local networks.    607 # Adapt to list your (internal) IP networks from where browsing    608 # should be allowed    609 acl localnet src 10.0.0.0/8     # RFC1918 possible internal network    610 acl localnet src 172.16.0.0/12  # RFC1918 possible internal network    611 acl localnet src 192.168.0.0/16 # RFC1918 possible internal network    612 acl skills src 192.168.0.0/24     # skills 라는 출발지 네트워크를 추가하였다.
+      .      .
+    673 # Example rule allowing access from your local networks.    674 # Adapt localnet in the ACL section to list your (internal) IP networks    675 # from where browsing should be allowed    676 #http_access allow localnet    677 http_access allow localhost    678 http_access allow skills     # 앞에서 추가한 skills라는 오브젝트에 대하여 프록시 서비스 사용을 허용한다.    679 # And finally deny all other access to this proxy    680 http_access deny all           # 위에서 추가한 정책 이외의 모든 오프젝트에 대하여 프록시 서비스 사용을 제한한다.      .
+      .
+   1113 # Squid normally listens to port 3128   1114 http_port 3128  # 서비스 포트를 설한다. 기본값은 3128입니다.   1115
+ :x
+ 
+root@squid:~# service squid restart
+ Restarting Squid HTTP proxy: squid Waiting.....................done.
+ 
+리눅스에 서비스 설정이 완료되면 인터넷탐색기에서 아래와 같이 프록시 설정을 한다.
+ 
+
+Squid Proxy Server에서 유해사이트 필터링
+
+이번 시간에는 Squid Proxy Service에서 유해사이트 필터링 방법에 관하여 공부하도록 합니다.
+ 
+조건 : 인터넷탐색기의 주소란에 sex, prono, game등이 단어가 포함된다면 해당 사이트를 차단하도록 한다.
+ 
+root@squid:~# vim /etc/squid/squid.conf
+:set nu
+     .
+     .
+    612 acl skills src 192.168.0.0/24    613 acl bad_sites url_regex "/etc/squid/bad_sites"    # bad_sites라는 오프젝트를 추가하고 차단할 단어는 "/etc/squid/bad_sites" 파일에 저장한다.
+      .
+      .
+    679 http_access deny bad_sites                            # bad_sites라는 오프젝트에 대하여 프록시 사용을 제한하는 정책을 추가하다.    680 http_access allow skills                                  # 반드시 허용 정책 앞에 추가하도록 한다.    681 # And finally deny all other access to this proxy    682 http_access deny all
+:x
+ 
+root@squid:~# vim /etc/squid/bad_sites
+sexpronogame~~:x
+ 
+root@squid:~# chown proxy /etc/squid/bad_sites
+root@squid:~# chmod 644 /etc/squid/bad_sites
+root@squid:~# service squid restart
+Restarting Squid HTTP proxy: squid.
+ 인터넷탐색기에서 차단을 원하는 문자열이 포함된 주소를 입력하면 아래와 같이 해당 사이트가 차단됨을 확인할 수 있다.
+ 
+
+ 
+상기 차단정책에 대한 안내 페이지를 한그로 보시려면 아래와 같이 수정한다.
+ 
+root@squid:~# vim /etc/squid/squid.conf
+:set nu
+   4224 #Default:   4225 error_directory /usr/share/squid/errors/Korean   4226   4227 #  TAG: error_map   4228 #       Map errors to custom messages :x
+ 
+
+ 
+만약, 제한된 사이트를 사용자 접속할 경우 강제로 http://www.naver.com으로 리다이렉션 하기를 원다면 아래와 같은 정책을 추가한다.
+ 
+root@squid:~# /etc/squid/squid.conf
+:set nu
+# Example rule allowing access from your local networks.# Adapt localnet in the ACL section to list your (internal) IP networks# from where browsing should be allowed#http_access allow localnethttp_access allow localhosthttp_access deny bad_siteshttp_access allow skills# And finally deny all other access to this proxyhttp_access deny alldeny_info http://www.naver.com bad_sites:x
