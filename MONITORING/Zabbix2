@@ -1,0 +1,254 @@
+Open source System Monitoring System (SMS) - Zabbix 활용편
+
+1. Linux Zabbix Agent설치
+
+root@debian:~# apt-get install zabbix-agent
+root@debian:~# vim /etc/zabbix/zabbix_agentd.conf
+set nu:
+ 10 # Note that hostnames must resolve hostname->IP address and
+ 11 # IP address->hostname.
+ 12
+ 13 Server=192.168.10.20      # Zabbix Server가 설치되어 있는 주소
+ 14
+ 15 # Server port for sending active checks
+ 16
+ 17 #ServerPort=10051
+ 18
+ 19 # Unique hostname. Required for active checks.
+ 20
+ 21 Hostname=localhost
+ 22
+ 23 # Listen port. Default is 10050
+ 24
+ 25 #ListenPort=10050
+:x
+root@debian:~# service zabbix-agent restart 
+Stopping Zabbix agent: zabbix_agentd.
+Starting Zabbix agent: zabbix_agentd.
+root@debian:~# netstat -nl 
+Active Internet connections (only servers)
+Proto Recv-Q Send-Q Local Address           Foreign Address         State
+tcp        0      0 0.0.0.0:111             0.0.0.0:*               LISTEN
+tcp        0      0 0.0.0.0:22              0.0.0.0:*               LISTEN
+tcp        0      0 127.0.0.1:25            0.0.0.0:*               LISTEN
+tcp        0      0 0.0.0.0:10050           0.0.0.0:*               LISTEN
+tcp        0      0 0.0.0.0:43015           0.0.0.0:*               LISTEN
+tcp6       0      0 :::22                   :::*                    LISTEN
+tcp6       0      0 ::1:25                  :::*                    LISTEN
+
+Zabbix-Agent가 tcp 10050포트로 Listen되고 있다면 정상이다.
+
+
+2. Windows Server 2008 Zabbix Agent설치
+
+  http://www.zabbix.com 사이트에서 윈도우용 Zabbix Agent를 다운로드합니다.
+압축을 해제하시고 “C:\zabbix-agent” 폴더에 프로그램을 복사한다.
+(최근의 서버운영체제는 대부분 64비트 운영체제를 사용하므로 64비트 버전만 복사하시면 됩니다.)
+  설정파일은 별도로 만드실 필요없이 리눅스에서 복사해서 사용하시면 됩니다.
+
+설정파일의 내용을 아래와 같이 수정합니다.
+
+# List of comma delimited IP addresses (or hostnames) of ZABBIX servers. 
+# No spaces allowed. First entry is used for sending active checks.
+# Note that hostnames must resolve hostname->IP address and
+# IP address->hostname.
+
+Server=192.168.10.20     # Zabbix Server의 IP주소
+
+# Server port for sending active checks
+
+#ServerPort=10051
+
+# Unique hostname. Required for active checks.
+
+Hostname=localhost
+
+# Listen port. Default is 10050
+
+#ListenPort=10050
+
+# IP address to bind agent
+# If missing, bind to all available IPs
+
+#ListenIP=127.0.0.1
+
+# Number of pre-forked instances of zabbix_agentd.
+# Default value is 5
+# This parameter must be between 1 and 16
+
+StartAgents=5
+
+# How often refresh list of active checks. 2 minutes by default.
+
+#RefreshActiveChecks=120
+
+# Disable active checks. The agent will work in passive mode listening server.
+
+#DisableActive=1
+
+# Enable remote commands for ZABBIX agent. By default remote commands disabled.
+
+#EnableRemoteCommands=1
+
+# Specifies debug level
+# 0 - debug is not created
+# 1 - critical information
+# 2 - error information
+# 3 - warnings
+# 4 - information (default)
+# 5 - for debugging (produces lots of information)
+
+DebugLevel=3
+
+# Name of PID file
+
+PidFile=c:\zabbix-agent/zabbix_agentd.pid
+
+# Name of log file.
+# If not set, syslog will be used
+
+LogFile=c:\zabbix-agent/zabbix_agentd.log  # log가 저장될 위치
+
+
+명령프롬프트 창을 실행한 후 아래와 같이 실행한다.
+
+Microsoft Windows [Version 6.1.7601]
+Copyright (c) 2009 Microsoft Corporation.  All rights reserved.
+
+C:\Users\Administrator>cd c:\zabbix-agent
+
+c:\zabbix-agent>zabbix_agentd --config c:\zabbix-agent\zabbix_agent.conf --install
+zabbix_agentd [1136]: Service "Zabbix Agent" installed successfully.
+zabbix_agentd [1136]: Event source "Zabbix Agent" installed successfully.
+ 
+
+
+“시작->관리도구->서비스”에 Zabbix Agent가 등록되었는지 확인하도록 합니다.
+
+
+Zabbix Agent 서비스를 시작하도록 합니다.
+
+
+ 윈도우방화벽에서 서비스 포트를 개방하도록 합니다.
+
+
+
+
+
+
+
+
+
+  정책이름을 ‘Zabbix’라 정의하고 “마침”합니다.
+
+
+
+
+
+
+
+
+
+
+
+
+3. Zabbix Server에 호스트 등록
+
+“설정->호스트 그룹”에서 호스트 그룹을 생성합니다. 물론 기존에 등록된 그룹을 사용하여도 상관 없겠지요.
+
+
+
+ ‘Skills’라는 새 호스트 그룹을 생성하도록 합니다. 반드시 “저장” 버튼을 클릭하는 것을 잊지 마시라.
+
+
+“설정->호스트”에서 앞서 Zabbix-Agent를 설치한 호스트를 등록하도록 합니다.
+
+
+
+
+
+
+
+
+ 이름, In그룹, IP주소를 입력하고 ‘Linked Templates’의 “추가” 버튼을 클릭합니다.
+
+
+템플릿 그룹 ‘Templates’의 ‘Template_Linux’를 선택하고 “저장” 버튼을 클릭합니다.
+
+
+
+ 마지막으로 “저장” 버튼을 클릭하여 호스트를 등록합니다.
+
+
+
+ Windows Server도 동일한 방법으로 등록하도록 합니다. 이때 템플릿은 ‘Template_ Windows’를 선택하도록 합니다.
+
+  마지막으로 해당 서버를 모니터링을 활성화 하도록 합니다.
+
+
+  ‘상태’란에 녹색의 “Z” 아이콘이 활성화되면 정상적으로 통신이 이루어지고 있음을 의미합니다.
+
+
+  이제 각 호스트의 CPU부하율과 메모리 사용량을 그래프를 통하여 모니터링 해 보도록 합시다.
+
+
+  그래프 이름과 그래프 종류를 선택하고 그래프에 추가할 아이템을 선택하도록 합니다. 
+
+
+파라미터 값과 그래프 색을 결정하고 “추가” 버튼을 클릭합니다. 
+
+
+
+
+
+  CPU의 부하율(1분/5분/15분)을 각각 추가하도록 합니다.
+
+
+  “저장” 버튼을 클릭하여 그래프 추가를 종료합니다.
+
+
+
+
+
+  동일한 방법으로 메모리 사용량에 대한 그래프도 추가하였습니다.
+
+
+  각 호스트의 모니터링 그래프를 한 화면에 볼 수 있도록 스크린을 작성해 보도록 합시다.
+“설정->스크린” 메뉴에서 ‘스크린 작성’ 버튼을 클릭합니다.
+
+
+ 2행 2열의 셀을 가지는 ‘Skills’라는 스크린을 생성합니다.
+
+
+
+ 각 셀에 그래프를 추가하도록 합니다.
+
+
+
+
+
+
+
+
+ 스크린 작성이 완료되면 대략 이런 모습이 되겠습니다.
+
+
+  마지막으로 “맵”을 작성해 보도록 합시다.
+“설정->맵”에서 ‘맵 작성’ 버튼을 클릭하여 “Skill Networks”라는 맵을 생성하도록 합니다.
+
+
+  맵에 호스트를 등록하고 링크를 연결하도록 합니다.
+
+
+
+
+  Skills 그룹의 Windows Server와 Linux Server를 등록하고 Link를 연결하였습니다.
+
+
+ 이제 모든 호스트 등록이 완료되었으므로 “모니터링” 메뉴에서 ‘스크린’과 ‘맵’을 통하여 해당 호스트의 상태를 모니터링 할 수 있습니다.  그림에서 “Linux Server”호스트는 10개의 장애가 발생하였다고 표시되는데 이는 “크리거”에서 설정하는 것으로 서비스 또는 자원의 사용에 따른 트리거를 설정함으로서 서버의 운영 상태까지 파악할 수 있는 기능입니다.
+
+
+
+“맵”에서는 간단한 Tool을 사용하여 Ping 테스트나 라우팅 경로를 추적할 수 있습니다.
+
+
