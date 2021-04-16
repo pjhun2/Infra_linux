@@ -1,0 +1,67 @@
+Apache Rewrite Module을 이용한 시간대별 접속페이지 변경
+
+root@mail:~# a2enmod rewrite
+Enabling module rewrite.
+Run '/etc/init.d/apache2 restart' to activate new configuration!
+
+root@mail:~# vim /var/www/index.html
+Current Time 09:00 ~ 18:00
+:x
+
+root@mail:~# vim /var/www/index2.html
+Current Time 18:01~08:59
+:x
+
+root@mail:~# vim /etc/apache2/sites-enabled/000-default
+:set nu
+  1 <VirtualHost *:80>
+  2         ServerAdmin webmaster@localhost
+  3
+  4         DocumentRoot /var/www
+  5         <Directory />
+  6                 Options FollowSymLinks
+  7                 AllowOverride None
+  8         </Directory>
+  9         <Directory /var/www/>
+ 10                 Options Indexes FollowSymLinks MultiViews
+ 11                 AllowOverride None
+ 12                 Order allow,deny
+ 13                 allow from all
+ 14
+ 15                 RewriteEngine On
+ 16                 RewriteBase /
+ 17
+ 18                 RewriteCond %{TIME_HOUR}%{TIME_MIN} >1800 [OR]
+ 19                 RewriteCond %{TIME_HOUR}%{TIME_MIN} <0900
+ 20                 RewriteRule ^index\.html$ /index2.html
+ 21         </Directory>
+:x
+
+root@mail:~# service apache2 restart
+Restarting web server: apache2 ... waiting .
+root@mail:~# date 080709002013
+Wed Aug  7 09:00:00 KST 2013
+
+
+root@mail:~# date 080720002013
+Wed Aug  7 20:00:00 KST 2013
+
+
+
+Time and Date RewriteCond Variables
+
+TIME_YEARcurrent four-digit year
+TIME_MONcurrent month (0-11)
+TIME_DAYcurrent date
+TIME_HOURcurrent hour (0-23)
+TIME_MINcurrent minute (0-59)
+TIME_SECcurrent second-count (0-59)
+TIME_WDAYcurrent week-day (0-6)
+
+ex) 
+RewriteEngine On
+RewriteBase /
+RewriteCond %{TIME_SEC} <30
+RewriteRule ^dream/?$ /promo.php [L]
+RewriteCond %{TIME_SEC} >29
+RewriteRule ^dream/?$ /promo1.php [L]
