@@ -1,1 +1,37 @@
-#mysql
+데이터베이스 MySQL DB Repair
+
+1. 전체 데이터베이스 체크 및 자동복구
+ 
+mysqlcheck -Aao --auto-repair -u root -p
+ 
+-A, --all-databas
+-a, --analyze
+-o, --optimize
+ 
+2. 특정 데이터베이스 체크 및 자동복구
+ 
+mysqlcheck --auto-repair -u root -p [DB명]
+ 
+3. 특정 데이터베이스의 특정테이블만 체크 및 자동복구
+ 
+mysqlcheck --auto-repair -u root -p [DB명] [TABLE명]
+
+
+
+
+데이터베이스 MySQL 데이터 V4.1 -> V4.0 덤프
+
+MySQL 데이터 버전 4.1 -> 4.0 으로 다운그레이드 하는 방법
+
+mysqldump --create-options --compatible=mysql40 -uroot -p DBname >b.sql
+
+mysql 4.1 버전부터는 mysqldump를 그냥 실행하면 utf-8 코드로 백업 받습니다.
+
+따라서 mysqldump를 할때 --default-character-set=euckr 옵셥을 주면 euckr 코드로 덤프 받습니다.
+
+4.1버전의 경우 latin1 으로 기본세팅이 되므로 euckr 대신 latin1으로 해야할 수도 있습니다.
+
+인서트문이 한줄씩 나오지 않을때는 --extended-insert=FALSE 를 추가합니다.
+
+
+
