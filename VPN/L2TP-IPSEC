@@ -1,0 +1,210 @@
+root@debian:~# apt-get install openswan xl2tpd
+
+
+
+root@debian:~# cp /etc/ipsec.d/examples/l2tp-psk.conf /etc/ipsec.d
+root@debian:~# cp /etc/ipsec.d/examples/sysctl.conf /etc/sysctl.conf
+root@debian:~# vim /etc/ipsec.conf
+:set nu
+ 22         #
+ 23         # NAT-TRAVERSAL support, see README.NAT-Traversal
+ 24         nat_traversal=yes
+ 25         # exclude networks used on server side by adding %v4:!a.b.c.0/24
+ 26         virtual_private=%v4:10.0.0.0/8,%v4:!192.168.0.0/16,%v4:172.16.0.0/12
+            ; 만약, 사설네트워크를 외부인터페이스에 할당하여 사용한다면 해당 네트워크 
+              앞에 “!” 문자를 추가한다.
+              필자의 경우 192.168.0.0/16 네트워크를 외부 네트워크에 사용하므로 
+              !192.168.0.0/16으로 수정 하였습니다.
+ 27         # OE is now off by default. Uncomment and change to on, to enable.
+ 28         oe=off
+ 29         # which IPsec stack to use. auto will try netkey, then klips then ma    st
+ 30         protostack=netkey
+  .
+  .
+ 48 #               #auto=add
+ 49 include /etc/ipsec.d/l2tp-psk.conf
+:x
+
+root@debian:~# vim /etc/ipsec.d/l2tp-psk.conf
+:set nu
+ 27         #
+ 28         left=192.168.10.162      ; VPN 서버의 IP를 입력합니다.
+ 29         leftnexthop=192.168.10.1 ; VPN 서버의 Gateway를 입력합니다.
+ 30         #
+ 31         # For updated Windows 2000/XP clients,
+ 32         # to support old clients as well, use leftprotoport=17/%any
+ 33         leftprotoport=17/1701
+ 34         #
+ 35         # The remote user.
+ 36         #
+ 37         right=%any
+ 38         # Using the magic port of "0" means "any one single port". This is
+ 39         # a work around required for Apple OSX clients that use a randomly
+ 40         # high port, but propose "0" instead of their port. If this does
+ 41         # not work, use 17/%any instead.
+ 42         rightprotoport=17/%any
+:x
+
+root@debian:~# vim /etc/ipsec.secrets
+# RCSID $Id: ipsec.secrets.proto,v 1.3.6.1 2005/09/28 13:59:14 paul Exp $
+# This file holds shared secrets or RSA private keys for inter-Pluto
+# authentication.  See ipsec_pluto(8) manpage, and HTML documentation.
+
+# RSA private key for this host, authenticating it to any other host
+# which knows the public part.  Suitable public keys, for ipsec.conf, DNS,
+# or configuration of other implementations, can be extracted conveniently
+# with "ipsec showhostkey".
+
+# this file is managed with debconf and will contain the automatically created RSA keys
+#include /var/lib/openswan/ipsec.secrets.inc
+192.168.10.162  %any:   PSK     "password"
+ (VPN서버 IP)                     (ipsec 암호)
+
+root@debian:~# vim /etc/xl2tpd/xl2tpd.conf
+:set nu
+ 10 ;
+ 11 [global]                                    ; Global parameters:
+ 12 ipsec saref = yes
+ 13 ; port = 1701                              ; * Bind to port 1701
+  .
+  .
+ 23 [lns default]                               ; Our fallthrough LNS definition
+ 24 ; exclusive = no                           ; * Only permit one tunnel per host
+ 25 ip range = 192.168.0.100-192.168.0.200  ; * 클라이언트 IP 자동할당 범위
+ 26 ; no ip range = 192.168.0.3-192.168.0.9 ; * Except these hosts
+ 27 ; ip range = 192.168.0.5                 ; * But this one is okay
+ 28 ; ip range = lac1-lac2                  ; * And anything from lac1 to lac2's IP
+ 29 ; lac = 192.168.1.4 - 192.168.1.8        ; * These can connect as LAC's
+ 30 ; no lac = untrusted.marko.net         ; * This guy can't connect
+ 31 ; hidden bit = no                       ; * Use hidd    en AVP's?
+ 32 local ip = 192.168.0.1                   ; * 터널 인터페이스 IP
+ 33 length bit = yes                         ; * Use length bit in payload?
+ 34 ; require chap = yes                    ; * Require CHAP auth. by peer
+ 35 refuse pap = yes                        ; * Refuse PAP authentication
+ 36 refuse chap = yes                       ; * Refuse CHAP authentication
+ 37 ; refuse authentication = no            ; * Refuse authentication altogether
+ 38 require authentication = yes             ; * Require peer to authenticate
+ 39 ; unix authentication = no              ; * Use /etc/passwd for auth.
+ 40 ; name = myhostname                   ; * Report this as our hostname
+ 41 ppp debug = yes                         ; * Turn on PPP debugging
+ 42 pppoptfile = /etc/ppp/options.l2tpd       ; * ppp options file
+:x
+
+root@debian:~# cp /etc/ppp/options /etc/ppp/options.lt2tpd
+root@debian:~# vim /etc/ppp/options.l2tpd
+:set nu
+ .
+ .
+ 10 # Specify which DNS Servers the incoming Win95 or WinNT Connection should use
+ 11 # Two Servers can be remotely configured
+ 12 ms-dns 192.168.10.1      ; 클라이언트가 사용할 DNS서버 주소
+ 13 # ms-dns 192.168.1.2
+ 14
+ 15 # Specify which WINS Servers the incoming connection Win95 or WinNT should use
+ 16 # ms-wins 192.168.1.50
+ 17 # ms-wins 192.168.1.51
+ 18
+ 19 # Run the executable or shell command specified after pppd has
+ 20 # terminated the link.  This script could, for example, issue commands
+ 21 # to the modem to cause it to hang up if hardware modem control signals
+ 22 # were not available.
+ 23 #disconnect "chat -- \d+++\d\c OK ath0 OK"
+ 24 require-mschap-v2
+  .
+  .
+188 # Set the name of the local system for authentication purposes to <n>.
+189 # This is a privileged option. With this option, pppd will use lines in the
+190 # secrets files which have <n> as the second field when looking for a
+191 # secret to use in authenticating the peer. In addition, unless overridden
+192 # with the user option, <n> will be used as the name to send to the peer
+193 # when authenticating the local system to the peer. (Note that pppd does
+194 # not append the domain name to <n>.)
+195 name l2tpd
+  .
+  .
+205 # Add an entry to this system's ARP [Address Resolution Protocol]
+206 # table with the IP address of the peer and the Ethernet address of this
+207 # system.
+208 proxyarp
+209
+:x
+
+root@debian:~# vim /etc/ppp/chap-secrets
+# Secrets for authentication using CHAP
+# client        server  secret                  IP addresses
+manager         l2tpd    password        *
+(아이디)                     (암호)       (접속허용 네트워크)
+
+root@debian:~# reboot
+root@debian:~# service ipsec restart
+ipsec_setup: Stopping Openswan IPsec...
+ipsec_setup: Starting Openswan IPsec U2.6.28/K2.6.32-5-686...
+root@debian:~# service xl2tpd restart
+Restarting xl2tpd: xl2tpd.
+root@debian:~# ipsec verify
+Checking your system to see if IPsec got installed and started correctly:
+Version check and ipsec on-path                                 [OK]
+Linux Openswan U2.6.28/K2.6.32-5-686 (netkey) 
+Checking for IPsec support in kernel                             [OK]
+NETKEY detected, testing for disabled ICMP send_redirects       [OK]
+NETKEY detected, testing for disabled ICMP accept_redirects     [OK]
+Checking that pluto is running                                   [OK]
+Pluto listening for IKE on udp 500                                [OK]
+Pluto listening for NAT-T on udp 4500                           [OK]
+Checking for 'ip' command                                       [OK]
+Checking for 'iptables' command                                 [OK]
+Opportunistic Encryption Support                                [DISABLED]
+root@debian:~# netstat -nl 
+udp        0      0 127.0.0.1:500           0.0.0.0:*
+udp        0      0 192.168.10.162:500      0.0.0.0:*
+udp        0      0 127.0.0.1:4500          0.0.0.0:*
+udp        0      0 192.168.10.162:4500     0.0.0.0:*
+udp        0      0 0.0.0.0:1701            0.0.0.0:*
+Windows Client 설정
+
+
+
+
+“/etc/ipsec.secrets”파일에 설정한 암호를 입력합니다.
+
+
+“/etc/ppp/chap-secrets” 파일에 설정한 아이디와 암호를 통하여 접속합니다.
+
+
+root@debian:~# tail -F /var/log/auth.log
+Mar 18 00:58:54 debian pluto[2067]: "L2TP-PSK-noNAT"[1] 192.168.10.110 #2: transition from state STATE_QUICK_R1 to state STATE_QUICK_R2
+Mar 18 00:58:54 debian pluto[2067]: "L2TP-PSK-noNAT"[1] 192.168.10.110 #2: STATE_QUICK_R2: IPsec SA established transport mode {ESP=>0xe2dfda77 <0x2fd897d5 xfrm=AES_128-HMAC_SHA1 NATOA=none NATD=none DPD=none}
+
+
+
+
+
+윈도우 클라이언트에서 IP할당 확인
+
+C:\Users\Administrator>ipconfig /all | more
+PPP 어댑터 VPN 연결:
+   연결별 DNS 접미사. . . . :
+   설명. . . . . . . . . . . . : VPN 연결
+   물리적 주소 . . . . . . . . :
+   DHCP 사용 . . . . . . . . . : 아니요
+   자동 구성 사용. . . . . . . : 예
+   IPv4 주소 . . . . . . . . . : 192.168.0.100(기본 설정)
+   서브넷 마스크 . . . . . . . : 255.255.255.255
+   기본 게이트웨이 . . . . . . : 0.0.0.0
+   DNS 서버. . . . . . . . . . : 192.168.10.1
+   Tcpip를 통한 NetBIOS. . . . : 사용
+
+만약, VPN서버를 통하여 인터넷을 사용하고자 한다면...
+
+root@debian:~# iptables -t nat -A POSTROUTING -s 192.168.0.0/24 -o eth0 -j MASQUERADE
+
+root@debian:~# iptables -t nat -L -n
+Chain PREROUTING (policy ACCEPT)
+target     prot opt source               destination
+
+Chain POSTROUTING (policy ACCEPT)
+target     prot opt source               destination
+MASQUERADE  all  --  192.168.0.0/24       0.0.0.0/0
+
+Chain OUTPUT (policy ACCEPT)
+target     prot opt source               destination
