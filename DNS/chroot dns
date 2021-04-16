@@ -1,0 +1,49 @@
+1. Install bind9 and its docs and utilities:
+
+# apt-get install bind9 bind9-doc dnsutils
+It will probably autostart after install, so stop it before proceeding:
+
+# /etc/init.d/bind9 stop
+2. Create your chroot. This requires a minimal file tree:
+
+# mkdir -p /var/chroot/bind9/{etc,dev,var/cache/bind,var/run/bind/run}
+# chown -R bind:bind /var/chroot/bind9/var/*
+And some devices:
+
+# mknod /var/chroot/bind9/dev/null c 1 3
+# mknod /var/chroot/bind9/dev/random c 1 8
+# chmod 666 /var/chroot/bind9/dev/{null,random}
+3. Move your default configuration files:
+
+# mv /etc/bind /var/chroot/bind9/etc
+# ln -s /var/chroot/bind9/etc/bind /etc/bind
+4. Tell rsyslog to listen for log events in the chroot:
+
+# vi /etc/rsyslog.d/bind-chroot.conf
+and add the line:
+
+$AddUnixListenSocket /var/chroot/bind9/dev/log
+5. Tell bind9 init to use the chroot:
+
+# vi /etc/default/bind9
+and add:
+
+OPTIONS="-u bind -t /var/chroot/bind9"
+6. Restart syslogd and make sure it creates /dev/log in the chroot.
+
+# /etc/init.d/rsyslog restart
+Restarting system log daemon: syslogd.
+
+
+# ls -al /var/chroot/bind9/dev/log
+srw-rw-rw- 1 root root 0 2008-10-09 14:48 /var/chroot/bind9/dev/log
+7. Start bind9 and make sure it works
+
+# /etc/init.d/bind9 start
+Starting domain name service...: bind.
+# ps ax | grep [n]amed
+ 5397 ?        Ssl    0:00 /usr/sbin/named -u bind -t /var/chroot/bind9
+# host localhost. 127.0.0.1
+localhost                   A        127.0.0.1
+Now, you're done the chroot portion. Copy over your old named.conf.local and db.yourdomain-here files, and restart again.
+
