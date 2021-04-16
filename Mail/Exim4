@@ -1,0 +1,77 @@
+root@exim4:~# apt-get install sasl2-bin
+root@exim4:~# vim /etc/default/saslauthd
+:set nu
+  1 #
+  2 # Settings for saslauthd daemon
+  3 # Please read /usr/share/doc/sasl2-bin/README.Debian for details.
+  4 #
+  5
+  6 # Should saslauthd run automatically on startup? (default: no)
+  7 START=yes
+  .
+  .
+   28 # Only one option may be used at a time. See the saslauthd man page
+ 29 # for more information.
+ 30 #
+ 31 # Example: MECHANISMS="pam"
+ 32 MECHANISMS="pam shadow"
+ 33
+:x
+
+root@exim4:~# vim /etc/exim4/update-exim4.conf.conf
+:set nu
+ 17 # This is a Debian specific file
+ 18
+ 19 dc_eximconfig_configtype='internet'             
+ 20 dc_other_hostnames='localhost ; mail.skill.com ; skill.com'  # 수신할 도메인 리스트
+ 21 dc_local_interfaces=''     # listen할 인터페이스 주소 입력
+ 22 dc_readhost=''
+ 23 dc_relay_domains=''
+ 24 dc_minimaldns='false'
+ 25 dc_relay_nets=''          # 반드시 비어 있어야 둘 것.
+ 26 dc_smarthost=''                                    
+ 27 CFILEMODE='644'
+ 28 dc_use_split_config='false'
+ 29 dc_hide_mailname=''
+ 30 dc_mailname_in_oh='true'
+ 31 dc_localdelivery='mail_spool'
+:x
+
+root@exim4:~# vim /etc/exim4/exim4.conf.template
+:set nu
+1839 # Authenticate against local passwords using sasl2-bin
+1840 # Requires exim_uid to be a member of sasl group, see README.Debian.gz
+1841  plain_saslauthd_server:
+1842    driver = plaintext
+1843    public_name = PLAIN
+1844    server_condition = ${if saslauthd{{$auth2}{$auth3}}{1}{0}}
+1845    server_set_id = $auth2
+1846    server_prompts = :
+1847 #   .ifndef AUTH_SERVER_ALLOW_NOTLS_PASSWORDS
+1848 #   server_advertise_condition = ${if eq{$tls_cipher}{}{}{*}}
+1849 #   .endif
+1850 #
+1851  login_saslauthd_server:
+1852    driver = plaintext
+1853    public_name = LOGIN
+1854    server_prompts = "Username:: : Password::"
+1855 #   # don't send system passwords over unencrypted connections
+1856    server_condition = ${if saslauthd{{$auth1}{$auth2}}{1}{0}}
+1857    server_set_id = $auth1
+1858 #   .ifndef AUTH_SERVER_ALLOW_NOTLS_PASSWORDS
+1859 #   server_advertise_condition = ${if eq{$tls_cipher}{}{}{*}}
+1860 #   .endif
+:x
+
+root@exim4:~# update-exim4.conf -d /etc/exim4 -o /etc/exim4/exim4.conf
+root@exim4:~# service saslauthd restart
+Stopping SASL Authentication Daemon: saslauthd.
+Starting SASL Authentication Daemon: saslauthd.
+
+root@exim4:~# service exim4 restart
+Stopping MTA for restart: exim4_listener.
+Restarting MTA: exim4.
+
+root@exim4:~# netstat -nl | grep 25
+tcp        0      0 0.0.0.0:25              0.0.0.0:*               LISTEN
+tcp6       0      0 :::25                   :::*                    LISTEN
