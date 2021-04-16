@@ -1,0 +1,80 @@
+Debian Linux PPTP VPN서비스
+
+1. Linux pptp(poptop) 설정
+
+root@pptp:~# apt-get install pptpd
+root@pptp:~# vim /etc/pptpd.conf
+:set nu
+ 75 # (Recommended)
+ 76 #localip 192.168.0.1
+ 77 #remoteip 192.168.0.234-238,192.168.0.245
+ 78 # or
+ 79 localip 172.16.0.1        # Server의 내부인터페이스 IP를 입력
+ 80 remoteip 172.16.0.100-199  # Client에서 자동으로 할당받을 IP주소 범위
+:x
+root@pptp:~# vim /etc/ppp/options
+:set nu
+ 11 # Two Servers can be remotely configured
+ 12 ms-dns 164.124.101.2   # Client에서 사용할 1차 네임서버
+ 13 ms-dns 168.126.63.1    # Client에서 사용할 2차 네임서버
+ 14
+ 15 # Specify which WINS Servers the incoming connection Win95 or WinNT should u    se
+ 16 # ms-wins 192.168.1.50   # Wins를 사용한다면 주석을 해제합니다.
+ 17 # ms-wins 192.168.1.51   
+:x
+
+root@pptp:~# vim /etc/ppp/chap-secrets
+:set nu
+  1 # Secrets for authentication using CHAP
+  2 # client        server  secret                  IP addresses
+  3 # 사용자이름   서버(서비스)  암호   접속허용 네트워크
+  4 user01  pptpd   user01_pass     *     
+  5 user02  pptpd   user02_pass     *
+:x
+
+root@pptp:/var/log# netstat -nl | more
+Active Internet connections (only servers)
+Proto Recv-Q Send-Q Local Address           Foreign Address         State
+tcp        0      0 0.0.0.0:111             0.0.0.0:*               LISTEN
+tcp        0      0 0.0.0.0:57620           0.0.0.0:*               LISTEN
+tcp        0      0 0.0.0.0:22              0.0.0.0:*               LISTEN
+tcp        0      0 127.0.0.1:25            0.0.0.0:*               LISTEN
+tcp        0      0 0.0.0.0:1723            0.0.0.0:*               LISTEN
+
+만약, Client에서 PPTP VPN연결을 통하여 인터넷 사용을 허용하고 싶다면
+root@pptp:~# sysctl -w net.ipv4.ip_forward=1
+net.ipv4.ip_forward = 1
+root@pptp:~# iptables -t nat -A POSTROUTING -o eth0 –j MASQUERADE
+
+2. Windows Client 설정
+
+네트워크 및 공유센터의 ‘연결 또는 네트워크 설정’ 메뉴를 클릭합니다.
+
+
+‘회사에 연결’ 아이콘을 선택하고 ‘다음’ 버튼을 클릭합니다.
+
+
+
+
+
+인터넷 주소(I): 에는 PPTP VPN서버의 외부 인터페이스 주소를 입력합니다. 
+
+
+pptp서버의 ‘/etc/ppp/chap-secrets’에 등록한 계정정보를 입력합니다.
+
+
+
+
+
+ 연결할 네트워크를 마우스 우측버튼을 클릭하여 ‘속성’을 메뉴를 클릭합니다.
+
+
+  “VPN 종류(E)”를 ‘PPTP VPN’으로 설정합니다.
+
+
+
+
+
+
+
+
